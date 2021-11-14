@@ -1,25 +1,26 @@
-package net.homework.blockchain;
+package net.homework.blockchain.client;
 
 import io.leonard.Base58;
+import lombok.SneakyThrows;
+import net.homework.blockchain.bean.Transaction;
 import org.apache.commons.codec.binary.Hex;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
-import java.security.*;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
+import java.security.Security;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.util.Arrays;
 
-public class Test {
+import static net.homework.blockchain.util.ByteUtils.removeLeadingZero;
 
-    public static byte[] removeLeadingZero(byte[] input) {
-        if (input[0] == 0)
-            return Arrays.copyOfRange(input, 1, input.length);
-        else
-            return input;
-    }
-
-    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
+public class UserImpl implements User {
+    @SneakyThrows
+    @Override
+    public String generatePriKey() {
         Security.addProvider(new BouncyCastleProvider());
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
         ECGenParameterSpec curve = new ECGenParameterSpec("secp256k1");
@@ -83,5 +84,16 @@ public class Test {
         // 9 - Base58 encoding of 8
         System.out.print("9: ");
         System.out.println(Base58.encode(b8));
+        return null;
+    }
+
+    @Override
+    public Transaction assembleTx() {
+        return null;
+    }
+
+    @Override
+    public void broadcastTx(Transaction tx) {
+
     }
 }
