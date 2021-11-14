@@ -6,6 +6,7 @@ import java.util.Map;
 
 public interface User {
     String generatePrivateKey();
+    String loadPrivateKey();
     String getPublicKey(String privateKey);
     String getAddress(String publicKey);
 
@@ -20,5 +21,5 @@ public interface User {
      * Get unspent transaction outputs.
      * @return transactionHash, outIndex
      */
-    Map<byte[], Integer> getUTXOs();
+    Map<Transaction, Integer> getUTXOs();
 }

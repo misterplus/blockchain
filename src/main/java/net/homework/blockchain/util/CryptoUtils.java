@@ -37,4 +37,8 @@ public class CryptoUtils {
     public static byte[] verifyTransaction(byte[] signedTransactionHash, byte[] publicKey) {
         // TODO: return transactionHash
     }
+
+    public static byte[] getPublicKeyHashFromAddress(String address) {
+        // TODO: return RIPEMD-160 Hash
+    }
 }
