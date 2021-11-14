@@ -75,6 +75,10 @@ public class NodeImpl implements Node {
                     if (inputInPool.getPreviousTransactionHash() == prevHash && inputInPool.getOutIndex() == outIndex)
                         return false;
                 }
+                // TODO: find the referenced output transaction on-chain or in pool
+                if (txInPool.hashTransaction() == prevHash) {
+
+                }
             }
         }
         // size should be bigger or equal to 100
