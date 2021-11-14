@@ -2,6 +2,7 @@ package net.homework.blockchain.client;
 
 import io.leonard.Base58;
 import lombok.SneakyThrows;
+import net.homework.blockchain.bean.Transaction;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.binary.Hex;
 
@@ -11,6 +12,7 @@ import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.util.Arrays;
+import java.util.Map;
 
 import static net.homework.blockchain.util.ByteUtils.removeLeadingZero;
 
@@ -73,6 +75,36 @@ public class UserImpl implements User {
         // 9 - Base58 encoding of 8
         System.out.print("9: ");
         System.out.println(Base58.encode(b8));
+        return null;
+    }
+
+    @Override
+    public String loadPrivateKey() {
+        return null;
+    }
+
+    @Override
+    public String getPublicKey(String privateKey) {
+        return null;
+    }
+
+    @Override
+    public String getAddress(String publicKey) {
+        return null;
+    }
+
+    @Override
+    public Transaction assembleTx(Map<byte[], byte[]> recipientsWithAmount) {
+        return null;
+    }
+
+    @Override
+    public void broadcastTx(Transaction tx) {
+
+    }
+
+    @Override
+    public Map<Transaction, Integer> getUTXOs() {
         return null;
     }
 }

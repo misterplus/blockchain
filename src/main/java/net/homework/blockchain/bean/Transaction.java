@@ -1,13 +1,18 @@
 package net.homework.blockchain.bean;
 
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
 
 import java.util.List;
 
+@NoArgsConstructor
+@Data
 public class Transaction {
 
-    private static class Input {
+    @Data
+    public static class Input {
         private byte[] previousTransactionHash;
         private int outIndex;
         private byte[] scriptSig;
@@ -26,10 +31,22 @@ public class Transaction {
             this.scriptSig = scriptSig;
             this.scriptPubKey = scriptPubKey;
         }
+
+        /**
+         * Construct a coinbase transaction input
+         */
+        public Input() {
+            this.previousTransactionHash = new byte[]{0};
+            this.outIndex = -1;
+            this.scriptSig = new byte[]{0};
+            this.scriptPubKey = new byte[]{0};
+        }
     }
 
-    private static class Output {
-        private byte[] value;
+    @NoArgsConstructor
+    @Data
+    public static class Output {
+        private long value;
         private byte[] scriptPubKeyHash;
 
         /**
@@ -37,7 +54,7 @@ public class Transaction {
          * @param value amount of coins to be sent
          * @param scriptPubKeyHash hash of the public key of the recipient
          */
-        public Output(byte[] value, byte[] scriptPubKeyHash) {
+        public Output(long value, byte[] scriptPubKeyHash) {
             this.value = value;
             this.scriptPubKeyHash = scriptPubKeyHash;
         }
@@ -45,11 +62,7 @@ public class Transaction {
 
     private List<Input> inputs;
     private List<Output> outputs;
-    /**
-     * Only present in a coinbase transaction. <br>
-     * When nonce overflows, this increments.
-     */
-    private Integer extraNonce;
+
 
     /**
      * Construct a normal transaction, do not initialize extraNonce.
@@ -61,16 +74,11 @@ public class Transaction {
         this.outputs = outputs;
     }
 
-    /**
-     * Construct a coinbase transaction, initialize extraNonce.
-     * @param outputs
-     */
-    public Transaction(List<Output> outputs) {
-        this(null, outputs);
-        this.extraNonce = 0;
+    public byte[] hashTransaction() {
+        return CryptoUtils.sha256(toBytes());
     }
 
-    public byte[] hashTransaction() {
-        return CryptoUtils.sha256(ByteUtils.toBytes(this));
+    public byte[] toBytes() {
+        return ByteUtils.toBytes(this);
     }
 }

@@ -2,7 +2,9 @@ package net.homework.blockchain.util;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.homework.blockchain.bean.Transaction;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -10,6 +12,24 @@ import java.util.Arrays;
 
 public class ByteUtils {
     private static final ObjectMapper MAPPER = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+
+    public static <T> T fromBytes(byte[] bytes, T t) {
+        try {
+            return (T) MAPPER.readValue(bytes, t.getClass());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static String toJson(Object o) {
+        try {
+            return MAPPER.writeValueAsString(o);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     public static byte[] toBytes(Object o) {
         try {

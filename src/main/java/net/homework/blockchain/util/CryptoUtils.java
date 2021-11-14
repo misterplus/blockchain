@@ -32,13 +32,16 @@ public class CryptoUtils {
 
     public static byte[] signTransaction(byte[] transactionHash, byte[] privateKey) {
         // TODO: return signedTransactionHash
+        return null;
     }
 
     public static byte[] verifyTransaction(byte[] signedTransactionHash, byte[] publicKey) {
         // TODO: return transactionHash
+        return null;
     }
 
     public static byte[] getPublicKeyHashFromAddress(String address) {
         // TODO: return RIPEMD-160 Hash
+        return null;
     }
 }

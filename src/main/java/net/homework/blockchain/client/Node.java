@@ -1,12 +1,12 @@
 package net.homework.blockchain.client;
 
+import net.homework.blockchain.bean.Transaction;
+
 public interface Node {
-    // 监听新转账
-    void listenForTx();
-    // 监听矿工连接
+    void listenForTransaction();
     void listenForMiner();
-    // 广播新区块
     void broadcastNewBlock();
-    // 监听新区块
     void listenForNewBlock();
+    boolean isTransactionValid(Transaction tx);
+    boolean isCoinbaseTransactionValid(Transaction tx, int size);
 }
