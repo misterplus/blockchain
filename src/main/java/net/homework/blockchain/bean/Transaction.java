@@ -1,7 +1,7 @@
 package net.homework.blockchain.bean;
 
 import net.homework.blockchain.util.ByteUtils;
-import net.homework.blockchain.util.HashUtils;
+import net.homework.blockchain.util.CryptoUtils;
 
 import java.util.List;
 
@@ -29,7 +29,7 @@ public class Transaction {
     }
 
     private static class Output {
-        private int value;
+        private byte[] value;
         private byte[] scriptPubKeyHash;
 
         /**
@@ -37,7 +37,7 @@ public class Transaction {
          * @param value amount of coins to be sent
          * @param scriptPubKeyHash hash of the public key of the recipient
          */
-        public Output(int value, byte[] scriptPubKeyHash) {
+        public Output(byte[] value, byte[] scriptPubKeyHash) {
             this.value = value;
             this.scriptPubKeyHash = scriptPubKeyHash;
         }
@@ -71,6 +71,6 @@ public class Transaction {
     }
 
     public byte[] hashTransaction() {
-        return HashUtils.sha256(ByteUtils.toBytes(this));
+        return CryptoUtils.sha256(ByteUtils.toBytes(this));
     }
 }

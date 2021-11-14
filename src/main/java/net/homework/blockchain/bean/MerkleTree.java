@@ -1,7 +1,7 @@
 package net.homework.blockchain.bean;
 
 import net.homework.blockchain.util.ByteUtils;
-import net.homework.blockchain.util.HashUtils;
+import net.homework.blockchain.util.CryptoUtils;
 
 import java.util.ArrayList;
 
@@ -38,13 +38,13 @@ public class MerkleTree {
         ArrayList<byte[]> parentHashList = new ArrayList<>();
         // hash the leaf transaction pair to get parent transaction
         for (int i = 0; i < tree.size(); i += 2) {
-            byte[] parentHash = HashUtils.sha256Twice(ByteUtils.concat(tree.get(i), tree.get(i + 1)));
+            byte[] parentHash = CryptoUtils.sha256Twice(ByteUtils.concat(tree.get(i), tree.get(i + 1)));
             parentHashList.add(parentHash);
         }
         // if odd number of transactions, duplicate the last transaction
         if (tree.size() % 2 == 1) {
             byte[] lastHash = tree.get(tree.size() - 1);
-            byte[] lastParent = HashUtils.sha256Twice(ByteUtils.concat(lastHash, lastHash));
+            byte[] lastParent = CryptoUtils.sha256Twice(ByteUtils.concat(lastHash, lastHash));
             parentHashList.add(lastParent);
         }
         return doRehash(parentHashList);

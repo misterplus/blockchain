@@ -3,7 +3,7 @@ package net.homework.blockchain.bean;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import net.homework.blockchain.Config;
 import net.homework.blockchain.util.ByteUtils;
-import net.homework.blockchain.util.HashUtils;
+import net.homework.blockchain.util.CryptoUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -70,7 +70,7 @@ public class Block {
     }
 
     private byte[] hashHeader() {
-        return HashUtils.sha256Twice(ByteUtils.toBytes(header));
+        return CryptoUtils.sha256Twice(ByteUtils.toBytes(header));
     }
 
     private boolean isBlockValid() {

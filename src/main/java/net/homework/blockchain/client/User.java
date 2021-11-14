@@ -2,11 +2,23 @@ package net.homework.blockchain.client;
 
 import net.homework.blockchain.bean.Transaction;
 
+import java.util.Map;
+
 public interface User {
-    // 私钥生成
-    String generatePriKey();
-    // 构造转账
-    Transaction assembleTx();
-    // 广播转账
+    String generatePrivateKey();
+    String getPublicKey(String privateKey);
+    String getAddress(String publicKey);
+
+    /**
+     *
+     * @param recipientsWithAmount publicKeyHash, value
+     * @return
+     */
+    Transaction assembleTx(Map<byte[], byte[]> recipientsWithAmount);
     void broadcastTx(Transaction tx);
+    /**
+     * Get unspent transaction outputs.
+     * @return transactionHash, outIndex
+     */
+    Map<byte[], Integer> getUTXOs();
 }
