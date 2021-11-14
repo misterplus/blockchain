@@ -16,6 +16,9 @@
     <properties>
         <java.version>1.8</java.version>
     </properties>
+    <repositories>
+
+    </repositories>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -37,10 +40,17 @@
             <artifactId>commons-codec</artifactId>
             <version>1.15</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/io.leonard/base58 -->
         <dependency>
-            <groupId>rm-hull</groupId>
+            <groupId>io.leonard</groupId>
             <artifactId>base58</artifactId>
-            <version>0.1.0</version>
+            <version>0.0.2</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk16 -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk16</artifactId>
+            <version>1.46</version>
         </dependency>
     </dependencies>
 
