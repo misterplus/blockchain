@@ -50,8 +50,10 @@ public class NodeImpl implements Node {
     public void listenForNewBlock() {
 
     }
-
     @Override
+    public boolean isTransactionValid(Transaction tx){
+        return false;
+    }
     public boolean isTransactionValid(Transaction tx, int size) {
         // tx is syntactically correct && neither inputs and outputs are empty
         if (tx == null || VerifyUtils.isListEmpty(tx.getInputs()) || VerifyUtils.isListEmpty(tx.getOutputs()))
@@ -93,7 +95,9 @@ public class NodeImpl implements Node {
 
         return false;
     }
-
+    public boolean isCoinbaseTransactionValid(Transaction tx, int size){
+        return false;
+    }
     // valid txs, to be processed by a miner
     public static Map<byte[], Transaction> txPool = new HashMap<>();
 }

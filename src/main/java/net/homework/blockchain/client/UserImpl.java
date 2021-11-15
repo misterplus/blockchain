@@ -6,6 +6,8 @@ import net.homework.blockchain.bean.Transaction;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.binary.Hex;
 
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.ECPrivateKey;
@@ -25,12 +27,22 @@ public class UserImpl implements User {
         kpg.initialize(curve);
         KeyPair kp = kpg.genKeyPair();
         ECPrivateKey pri = (ECPrivateKey) kp.getPrivate();
+        System.out.println(pri);
         ECPublicKey pub = (ECPublicKey) kp.getPublic();
+        System.out.println(pub);
         // 0 - Private ECDSA Key
         byte[] b0 = removeLeadingZero(pri.getS().toByteArray());
         System.out.print("0: ");
         System.out.println(Hex.encodeHex(b0, false));
-
+        ObjectOutputStream oos1 = null;
+        try {
+            oos1 = new ObjectOutputStream(new FileOutputStream("PublicKey"));
+            oos1.writeObject(Hex.encodeHex(b0, false));
+        } catch (Exception e) {
+            throw e;
+        } finally {
+            oos1.close();
+        }
         // 1 - Public ECDSA Key
         byte[] b1 = new byte[65];
         b1[0] = 4;
@@ -107,4 +119,5 @@ public class UserImpl implements User {
     public Map<Transaction, Integer> getUTXOs() {
         return null;
     }
+
 }
