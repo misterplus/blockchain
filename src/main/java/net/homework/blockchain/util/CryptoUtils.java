@@ -15,7 +15,8 @@ public class CryptoUtils {
         try {
             sha256 = MessageDigest.getInstance("SHA-256");
             ripemd160 = MessageDigest.getInstance("RIPEMD160");
-        } catch (NoSuchAlgorithmException ignored) {}
+        } catch (NoSuchAlgorithmException ignored) {
+        }
     }
 
     public static byte[] sha256Twice(byte[] input) {

@@ -2,9 +2,7 @@ package net.homework.blockchain.util;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.homework.blockchain.bean.Transaction;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -49,7 +47,7 @@ public class ByteUtils {
     }
 
     public static byte[] concat(byte[] a, byte[] b) {
-        ByteArrayOutputStream s = new ByteArrayOutputStream( );
+        ByteArrayOutputStream s = new ByteArrayOutputStream();
         try {
             s.write(a);
             s.write(b);
@@ -60,9 +58,10 @@ public class ByteUtils {
     }
 
     public static byte[] removeLeadingZero(byte[] input) {
-        if (input[0] == 0)
+        if (input[0] == 0) {
             return Arrays.copyOfRange(input, 1, input.length);
-        else
+        } else {
             return input;
+        }
     }
 }

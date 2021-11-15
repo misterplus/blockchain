@@ -10,16 +10,16 @@ public class MerkleTree {
     /**
      * List of hashes of all txs.
      */
-    private ArrayList<byte[]> tree;
+    private final ArrayList<byte[]> tree;
     private byte[] merkleRoot;
-
-    public byte[] hashMerkleTree() {
-        return merkleRoot;
-    }
 
     public MerkleTree(ArrayList<byte[]> tree) {
         this.tree = tree;
         rehash();
+    }
+
+    public byte[] hashMerkleTree() {
+        return merkleRoot;
     }
 
     public void rehash() {
@@ -27,14 +27,16 @@ public class MerkleTree {
     }
 
     public void addHash(Transaction transaction) {
-        if (this.tree.add(transaction.hashTransaction()))
+        if (this.tree.add(transaction.hashTransaction())) {
             rehash();
+        }
     }
 
     private ArrayList<byte[]> doRehash(ArrayList<byte[]> tree) {
         // return the root
-        if (tree.size() == 1)
+        if (tree.size() == 1) {
             return tree;
+        }
         ArrayList<byte[]> parentHashList = new ArrayList<>();
         // hash the leaf transaction pair to get parent transaction
         for (int i = 0; i < tree.size(); i += 2) {

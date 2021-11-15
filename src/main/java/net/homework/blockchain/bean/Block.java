@@ -10,21 +10,47 @@ import java.util.Arrays;
 import java.util.List;
 
 public class Block {
+    private final Header header;
+    private final List<Transaction> transactions;
+    public Block(byte[] hashPrevBlock, List<Transaction> transactions) {
+        ArrayList<byte[]> tree = new ArrayList<>();
+        for (Transaction tx : transactions) {
+            tree.add(tx.hashTransaction());
+        }
+        MerkleTree merkleTree = new MerkleTree(tree);
+        Block.Header header = new Header(hashPrevBlock, merkleTree);
+        this.header = header;
+        this.transactions = transactions;
+    }
+
+    public void addTransaction(Transaction tx) {
+        this.transactions.add(tx);
+        this.header.addHash(tx);
+    }
+
+    private byte[] hashHeader() {
+        return CryptoUtils.sha256Twice(ByteUtils.toBytes(header));
+    }
+
+    private boolean isBlockValid() {
+        return ByteUtils.isZero(Arrays.copyOf(hashHeader(), header.difficulty));
+    }
+
     private static class Header {
         private final byte[] hashPrevBlock;
         private byte[] hashMerkleRoot;
         private long time;
-        private int difficulty = Config.DIFFICULTY;
+        private final int difficulty = Config.DIFFICULTY;
         private int nonce = 0;
         @JsonIgnore
-        private MerkleTree merkleTree;
+        private final MerkleTree merkleTree;
 
         /**
          * @param hashPrevBlock hash of the previous block header
-         * hashMerkleRoot hash based on all of the transactions in the block
-         * time UTC timestamp
-         * difficulty difficulty of the network
-         * nonce for calculating the hash of this block
+         *                      hashMerkleRoot hash based on all of the transactions in the block
+         *                      time UTC timestamp
+         *                      difficulty difficulty of the network
+         *                      nonce for calculating the hash of this block
          */
         public Header(byte[] hashPrevBlock, MerkleTree merkleTree) {
             this.hashPrevBlock = hashPrevBlock;
@@ -48,33 +74,6 @@ public class Block {
             this.merkleTree.addHash(tx);
             this.updateMerkleRoot(this.merkleTree.hashMerkleTree());
         }
-    }
-
-    private Header header;
-    private List<Transaction> transactions;
-
-    public Block(byte[] hashPrevBlock, List<Transaction> transactions) {
-        ArrayList<byte[]> tree = new ArrayList<>();
-        for (Transaction tx : transactions) {
-            tree.add(tx.hashTransaction());
-        }
-        MerkleTree merkleTree = new MerkleTree(tree);
-        Block.Header header = new Header(hashPrevBlock, merkleTree);
-        this.header = header;
-        this.transactions = transactions;
-    }
-
-    public void addTransaction(Transaction tx) {
-        this.transactions.add(tx);
-        this.header.addHash(tx);
-    }
-
-    private byte[] hashHeader() {
-        return CryptoUtils.sha256Twice(ByteUtils.toBytes(header));
-    }
-
-    private boolean isBlockValid() {
-        return ByteUtils.isZero(Arrays.copyOf(hashHeader(), header.difficulty));
     }
 
     /**
