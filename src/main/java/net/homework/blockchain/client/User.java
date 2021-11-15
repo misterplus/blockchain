@@ -1,14 +1,22 @@
 package net.homework.blockchain.client;
 
 import net.homework.blockchain.bean.Transaction;
+import org.apache.commons.codec.DecoderException;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.spec.InvalidKeySpecException;
 import java.util.Map;
 
 public interface User {
-    String generatePrivateKey();
-    String loadPrivateKey();
-    String getPublicKey(String privateKey);
-    String getAddress(String publicKey);
+    String generatePrivateKey() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, IOException;
+    BigInteger loadPrivateKey() throws IOException, DecoderException;
+    char[] getPublicKey(BigInteger privateKey) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException;
+    String getAddress(char[] publicKey) throws DecoderException;
 
     /**
      *
