@@ -37,7 +37,9 @@ public class NodeImpl implements Node {
                     // Check that size in bytes >= 100
                     if (packet.getLength() >= 100) {
                         // verify this transaction
-                        VerifyUtils.verifyTx(tx, TX_POOL, ORPHAN_TXS);
+                        boolean accepted = VerifyUtils.verifyTx(tx, TX_POOL, ORPHAN_TXS);
+
+                        // TODO: send accepted msg back
                     }
                 }
                 // TODO: gracefully exit loop, send loopback msg?
@@ -65,7 +67,9 @@ public class NodeImpl implements Node {
                     // blocking
                     socket.receive(packet);
                     Block block = ByteUtils.fromBytes(data, new Block());
-                    VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL);
+                    boolean accepted = VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL);
+
+                    // TODO: send accepted msg back
                 }
                 // TODO: gracefully exit loop, send loopback msg?
             } catch (IOException e) {

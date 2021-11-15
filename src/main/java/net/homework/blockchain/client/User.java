@@ -17,7 +17,6 @@ public interface User {
     void broadcastTx(Transaction tx);
     /**
      * Get unspent transaction outputs.
-     *
      * @return transactionHash, outIndex
      */
     Map<Transaction, Integer> getUTXOs();
