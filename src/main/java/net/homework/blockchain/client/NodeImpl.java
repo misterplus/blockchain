@@ -65,7 +65,7 @@ public class NodeImpl implements Node {
                     // blocking
                     socket.receive(packet);
                     Block block = ByteUtils.fromBytes(data, new Block());
-                    VerifyUtils.verifyBlock(block, ORPHAN_BLOCKS, packet.getAddress());
+                    VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL);
                 }
                 // TODO: gracefully exit loop, send loopback msg?
             } catch (IOException e) {

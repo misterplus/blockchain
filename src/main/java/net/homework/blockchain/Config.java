@@ -7,4 +7,6 @@ public interface Config {
     int PORT_BLOCK_BROADCAST_IN = 10242;
     int COINBASE_MATURITY = 10;
     int MAX_BLOCK_SIZE = 32768;
+    // 5 btc
+    long BLOCK_FEE = 500000000L;
 }
