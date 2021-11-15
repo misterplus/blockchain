@@ -1,5 +1,8 @@
 package net.homework.blockchain.sql.dao;
 
-public interface BlockDao {
+import net.homework.blockchain.bean.Block;
 
+public interface BlockDao {
+    Block getBlock(byte[] headerHash);
+    boolean isSonPresentForParentBlock(byte[] parentBlockHash);
 }

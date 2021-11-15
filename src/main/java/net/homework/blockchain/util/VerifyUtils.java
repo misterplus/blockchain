@@ -3,17 +3,22 @@ package net.homework.blockchain.util;
 import net.homework.blockchain.Config;
 import net.homework.blockchain.bean.Block;
 import net.homework.blockchain.bean.Transaction;
+import net.homework.blockchain.sql.dao.BlockDao;
 import net.homework.blockchain.sql.dao.TxDao;
+import net.homework.blockchain.sql.dao.impl.BlockDaoImpl;
 import net.homework.blockchain.sql.dao.impl.TxDaoImpl;
 
 import java.io.IOException;
 import java.net.*;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 public class VerifyUtils {
 
     private static final TxDao txDao = new TxDaoImpl();
+    private static final BlockDao blockDao = new BlockDaoImpl();
 
     public static boolean isListEmpty(List<?> list) {
         return list == null || list.isEmpty();
@@ -44,40 +49,56 @@ public class VerifyUtils {
         return CryptoUtils.verifyTransaction(input.getScriptSig(), input.getScriptPubKey()) == input.getPreviousTransactionHash();
     }
 
-    public static boolean isOutputSpent() {
+    public static boolean isOutputSpent(byte[] refOut, int outIndex) {
         // TODO
         return false;
     }
 
-    public static void verifyTx(Transaction tx, Map<byte[], Transaction> txPool, Map<byte[], Transaction> orphanTxs) {
-        /*
-          Check syntactic correctness
-          Make sure neither in or out lists are empty
-         */
-        if (tx == null || isListEmpty(tx.getInputs()) || isListEmpty(tx.getOutputs())) {
-            return;
+    public static boolean isMoneyValueIllegal(long value) {
+        return value < 0L;
+    }
+
+    /**
+     * Convenience method for performing 2-4 checks (part of 4 is returned) on a transaction, since it's checked again in a block msg
+     * @param tx the transaction to perform checks on
+     * @return the output sum, to be used later in checks
+     */
+    public static long basicTxCheck(Transaction tx) {
+        // Make sure neither in or out lists are empty
+        if (isListEmpty(tx.getInputs()) || isListEmpty(tx.getOutputs())) {
+            return -1L;
         }
-        // Each output value, as well as the total, must be in legal money range
+        // Size in bytes <= MAX_BLOCK_SIZE
+        if (tx.toBytes().length > Config.MAX_BLOCK_SIZE)
+            return -1L;
+        // Each output value must be in legal money range
         long outputSum = 0;
         long outputValue;
         for (Transaction.Output output : tx.getOutputs()) {
-            // each output value is valid
             outputValue = output.getValue();
-            if (outputValue < 0L) {
-                return;
+            if (isMoneyValueIllegal(outputValue)) {
+                return -1L;
             } else {
                 outputSum += outputValue;
             }
         }
-        if (outputSum < 0L) {
+        return outputSum;
+    }
+
+    public static void verifyTx(Transaction tx, Map<byte[], Transaction> txPool, Map<byte[], Transaction> orphanTxs) {
+        // Check syntactic correctness
+        if (tx == null) {
             return;
         }
+
+        // Total output value must be in legal money range
+        long outputSum = basicTxCheck(tx);
+        if (isMoneyValueIllegal(outputSum))
+            return;
+
         // Make sure none of the inputs have hash=0, n=-1 (coinbase transactions)
-        for (Transaction.Input input : tx.getInputs()) {
-            if (isCoinbaseInput(input)) {
-                return;
-            }
-        }
+        if (tx.getInputs().stream().anyMatch(VerifyUtils::isCoinbaseInput))
+            return;
         // Reject if we already have matching tx in the pool, or in a block in the main branch
         byte[] txHash = tx.hashTransaction();
         // if it's a orphan who found parents, remove it from orphan pool
@@ -97,11 +118,12 @@ public class VerifyUtils {
             refOutTx = null;
             for (Transaction txInPool : txPool.values()) {
                 for (Transaction.Input inputInPool : txInPool.getInputs()) {
-                    // if the referenced output exists in any other tx in the pool, reject this transaction.
+                    // if the referenced output is spent by any other transaction in the pool, reject this transaction.
                     if (inputInPool.getPreviousTransactionHash() == refOut && inputInPool.getOutIndex() == outIndex) {
                         return;
                     }
                 }
+
                 // find the referenced output transaction in pool, if present, this tx is not orphan
                 if (isOutputPresentInTx(txInPool, refOut, outIndex)) {
                     refOutTx = txInPool;
@@ -123,7 +145,7 @@ public class VerifyUtils {
                     return;
                 }
                 // if the referenced output is spent, reject it
-                if (isOutputSpent()) {
+                if (isOutputSpent(refOut, outIndex)) {
                     return;
                 }
                 /*
@@ -137,21 +159,16 @@ public class VerifyUtils {
                     inputSum += inputValue;
                 }
             }
-
         }
         // Reject if the sum of input values < sum of output values
         // Reject if transaction fee (defined as sum of input values minus sum of output values) would be too low to get into an empty block
-        if (inputSum < 0L || inputSum <= outputSum) {
+        if (isMoneyValueIllegal(inputSum) || inputSum <= outputSum) {
             return;
         }
 
-        for (Transaction.Input input : tx.getInputs()) {
-            // Verify the scriptPubKey accepts for each input; reject if any are bad
-            if (!verifyInput(input)) {
-                return;
-            }
-        }
-
+        // Verify the scriptPubKey accepts for each input; reject if any are bad
+        if (!tx.getInputs().stream().allMatch(VerifyUtils::verifyInput))
+            return;
 
         // Add to transaction pool
         txPool.put(txHash, tx);
@@ -174,22 +191,90 @@ public class VerifyUtils {
             For each orphan transaction that uses this one as one of its inputs,
             run all these steps (including this one) recursively on that orphan.
          */
-        boolean flag;
         for (Transaction orphan : orphanTxs.values()) {
-            flag = false;
-            for (Transaction.Input input : orphan.getInputs()) {
-                if (input.getPreviousTransactionHash() == txHash && tx.getOutputs().size() > input.getOutIndex()) {
-                    flag = true;
-                    break;
-                }
-            }
-            if (flag) {
+            if (orphan.getInputs().stream().anyMatch(input -> isTxSpentByInput(orphan, input))) {
                 verifyTx(orphan, txPool, orphanTxs);
             }
         }
     }
 
-    public static void verifyBlock(Block block) {
+    public static boolean isTxSpentByInput(Transaction tx, Transaction.Input input) {
+        return input.getPreviousTransactionHash() == tx.hashTransaction() && tx.getOutputs().size() > input.getOutIndex();
+    }
+
+    public static void verifyBlock(Block block, Map<byte[], Block> orphanBlocks, InetAddress fromPeer) {
         // TODO
+        // Check syntactic correctness
+        if (block == null)
+            return;
+        byte[] headerHash = block.hashHeader();
+        List<Transaction> txs = block.getTransactions();
+        // Reject if block is duplicated
+        // Transaction list must be non-empty
+        // Block hash must satisfy claimed nBits proof of work, matching the difficulty
+        if (blockDao.getBlock(headerHash) != null || isListEmpty(txs) || !ByteUtils.isZero(Arrays.copyOf(headerHash, Config.DIFFICULTY)))
+            return;
+        Block.Header header = block.getHeader();
+        // Block timestamp must not be more than two hours in the future
+        if (header.getTime() > System.currentTimeMillis() + 7200000L) {
+            return;
+        }
+        // First transaction must be coinbase (i.e. only 1 input, with hash=0, n=-1), the rest must not be
+        if (!isCoinbaseTx(txs.get(0)))
+            return;
+        if (txs.subList(1, txs.size()).stream().anyMatch(VerifyUtils::isCoinbaseTx))
+            return;
+        // For each transaction, apply "tx" checks 2-4
+        if (txs.stream().anyMatch(tx -> isMoneyValueIllegal(basicTxCheck(tx)))) {
+            return;
+        }
+        // Verify Merkle hash
+        byte[] merkleHash = header.getHashMerkleRoot();
+        block.reconstructMerkleTree();
+        byte[] calculatedMerkleHash = header.getMerkleTree().hashMerkleTree();
+        if (merkleHash != calculatedMerkleHash)
+            return;
+
+        // Check if prev block is on-chain.
+        Block prevBlock = blockDao.getBlock(header.getHashPrevBlock());
+        if (prevBlock == null) {
+            // orphan block, add this to orphan blocks
+            orphanBlocks.put(headerHash, block);
+            // TODO: then query peer we got this from for orphan's parent;
+            return;
+        } else {
+            // if prevBlock already has a son, we reject this block completely (no multi-branch implementation for simplicity reasons)
+            if (blockDao.isSonPresentForParentBlock(prevBlock.hashHeader())) {
+                return;
+            } else {
+                // TODO: if prevBlock has no son, we are good, do more checks
+                byte[] refOut;
+                Transaction refOutTx;
+                int outIndex;
+                // For all but the coinbase transaction, apply the following:
+                for (Transaction tx : txs.subList(1, txs.size())) {
+                    // For each input, look in the main branch to find the referenced output transaction.
+                    for (Transaction.Input input : tx.getInputs()) {
+                        refOut = input.getPreviousTransactionHash();
+                        refOutTx = txDao.getTx(refOut);
+                        outIndex = input.getOutIndex();
+                        // Reject if the output transaction is missing for any input.
+                        if (refOutTx == null)
+                            return;
+                        // if we are using the nth (index) output of the earlier transaction, but it has fewer than n+1 outputs, reject.
+                        if (refOutTx.getOutputs().size() <= outIndex) {
+                            return;
+                        }
+                        if (isCoinbaseTx(refOutTx) && !isCoinbaseMature(refOutTx))
+                            return;
+                        if (!verifyInput(input))
+                            return;
+                        if (isOutputSpent(refOut, outIndex)) {
+                            return;
+                        }
+                    }
+                }
+            }
+        }
     }
 }

@@ -17,7 +17,9 @@ public class NodeImpl implements Node {
     // valid txs, to be processed by a miner
     public static Map<byte[], Transaction> TX_POOL = new HashMap<>();
     // because udp packets won't arrive in order, there'll be orphan transactions, waiting to be claimed by other txs
-    public static Map<byte[], Transaction> ORPHAN_POOL = new HashMap<>();
+    public static Map<byte[], Transaction> ORPHAN_TXS = new HashMap<>();
+    // orphan blocks
+    public static Map<byte[], Block> ORPHAN_BLOCKS = new HashMap<>();
 
     @Override
     public void listenForTransaction() {
@@ -35,7 +37,7 @@ public class NodeImpl implements Node {
                     // Check that size in bytes >= 100
                     if (packet.getLength() >= 100) {
                         // verify this transaction
-                        VerifyUtils.verifyTx(tx, TX_POOL, ORPHAN_POOL);
+                        VerifyUtils.verifyTx(tx, TX_POOL, ORPHAN_TXS);
                     }
                 }
                 // TODO: gracefully exit loop, send loopback msg?
@@ -63,7 +65,7 @@ public class NodeImpl implements Node {
                     // blocking
                     socket.receive(packet);
                     Block block = ByteUtils.fromBytes(data, new Block());
-                    VerifyUtils.verifyBlock(block);
+                    VerifyUtils.verifyBlock(block, ORPHAN_BLOCKS, packet.getAddress());
                 }
                 // TODO: gracefully exit loop, send loopback msg?
             } catch (IOException e) {

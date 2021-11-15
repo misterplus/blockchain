@@ -34,7 +34,19 @@ public class Block {
         this.header.addHash(tx);
     }
 
-    private byte[] hashHeader() {
+    /**
+     * Called when a node needs to verify a block's merkle hash
+     * we don't send the merkle tree over the network because it can be tempered with
+     */
+    public void reconstructMerkleTree() {
+        ArrayList<byte[]> tree = new ArrayList<>();
+        for (Transaction tx : this.transactions) {
+            tree.add(tx.hashTransaction());
+        }
+        this.header.merkleTree = new MerkleTree(tree);
+    }
+
+    public byte[] hashHeader() {
         return CryptoUtils.sha256Twice(ByteUtils.toBytes(header));
     }
 
@@ -56,6 +68,8 @@ public class Block {
         private final int difficulty = Config.DIFFICULTY;
         // for calculating the hash of this block
         private int nonce = 0;
+
+        // not present if received from network
         @JsonIgnore
         private MerkleTree merkleTree;
 
@@ -82,6 +96,8 @@ public class Block {
             this.updateMerkleRoot(this.merkleTree.hashMerkleTree());
         }
     }
+
+
 
     /**
      * Mining:
