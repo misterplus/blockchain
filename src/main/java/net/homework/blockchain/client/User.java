@@ -6,21 +6,15 @@ import java.util.Map;
 
 public interface User {
     String generatePrivateKey();
-
     String loadPrivateKey();
-
     String getPublicKey(String privateKey);
-
     String getAddress(String publicKey);
-
     /**
      * @param recipientsWithAmount publicKeyHash, value
-     * @return
+     * @return the assembled transaction
      */
     Transaction assembleTx(Map<byte[], byte[]> recipientsWithAmount);
-
     void broadcastTx(Transaction tx);
-
     /**
      * Get unspent transaction outputs.
      *

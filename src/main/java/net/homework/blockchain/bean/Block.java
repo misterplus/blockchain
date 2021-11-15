@@ -1,6 +1,9 @@
 package net.homework.blockchain.bean;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import net.homework.blockchain.Config;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
@@ -9,9 +12,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Block {
-    private final Header header;
-    private final List<Transaction> transactions;
+    private Header header;
+    private List<Transaction> transactions;
     public Block(byte[] hashPrevBlock, List<Transaction> transactions) {
         ArrayList<byte[]> tree = new ArrayList<>();
         for (Transaction tx : transactions) {
@@ -36,22 +42,23 @@ public class Block {
         return ByteUtils.isZero(Arrays.copyOf(hashHeader(), header.difficulty));
     }
 
-    private static class Header {
-        private final byte[] hashPrevBlock;
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Header {
+        // hash of the previous block header
+        private byte[] hashPrevBlock;
+        // hash based on all of the transactions in the block
         private byte[] hashMerkleRoot;
+        // UTC timestamp
         private long time;
+        // difficulty of the network
         private final int difficulty = Config.DIFFICULTY;
+        // for calculating the hash of this block
         private int nonce = 0;
         @JsonIgnore
-        private final MerkleTree merkleTree;
+        private MerkleTree merkleTree;
 
-        /**
-         * @param hashPrevBlock hash of the previous block header
-         *                      hashMerkleRoot hash based on all of the transactions in the block
-         *                      time UTC timestamp
-         *                      difficulty difficulty of the network
-         *                      nonce for calculating the hash of this block
-         */
         public Header(byte[] hashPrevBlock, MerkleTree merkleTree) {
             this.hashPrevBlock = hashPrevBlock;
             this.merkleTree = merkleTree;
