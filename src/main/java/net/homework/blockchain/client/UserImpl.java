@@ -5,12 +5,15 @@ import lombok.SneakyThrows;
 import net.homework.blockchain.bean.Transaction;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.binary.Hex;
+import org.bouncycastle.jce.ECNamedCurveTable;
+import org.bouncycastle.jce.interfaces.ECPrivateKey;
+import org.bouncycastle.jce.interfaces.ECPublicKey;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.jce.spec.ECParameterSpec;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.interfaces.ECPrivateKey;
-import java.security.interfaces.ECPublicKey;
-import java.security.spec.ECGenParameterSpec;
+import java.security.Security;
 import java.util.Arrays;
 import java.util.Map;
 
@@ -20,23 +23,21 @@ public class UserImpl implements User {
     @SneakyThrows
     @Override
     public String generatePrivateKey() {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
-        ECGenParameterSpec curve = new ECGenParameterSpec("secp256k1");
+        Security.addProvider(new BouncyCastleProvider());
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("ECDSA", "BC");
+        ECParameterSpec curve = ECNamedCurveTable.getParameterSpec("secp256k1");
         kpg.initialize(curve);
         KeyPair kp = kpg.genKeyPair();
         ECPrivateKey pri = (ECPrivateKey) kp.getPrivate();
         ECPublicKey pub = (ECPublicKey) kp.getPublic();
         // 0 - Private ECDSA Key
-        byte[] b0 = removeLeadingZero(pri.getS().toByteArray());
-        System.out.print("0: ");
+        byte[] b0 = removeLeadingZero(pri.getD().toByteArray());
+        System.out.println("0: ");
         System.out.println(Hex.encodeHex(b0, false));
 
         // 1 - Public ECDSA Key
-        byte[] b1 = new byte[65];
-        b1[0] = 4;
-        System.arraycopy(removeLeadingZero(pub.getW().getAffineX().toByteArray()), 0, b1, 1, 32);
-        System.arraycopy(removeLeadingZero(pub.getW().getAffineY().toByteArray()), 0, b1, 33, 32);
-        System.out.print("1: ");
+        byte[] b1 = pub.getQ().getEncoded();
+        System.out.println("1: ");
         System.out.println(Hex.encodeHex(b1, false));
 
         // 2 - SHA-256 hash of 1

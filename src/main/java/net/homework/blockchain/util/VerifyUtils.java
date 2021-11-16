@@ -49,7 +49,7 @@ public class VerifyUtils {
     }
 
     public static boolean verifyInput(Transaction.Input input) {
-        return CryptoUtils.verifyTransaction(input.getScriptSig(), input.getScriptPubKey()) == input.getPreviousTransactionHash();
+        return CryptoUtils.verifyTransaction(input.getPreviousTransactionHash(), input.getScriptSig(), CryptoUtils.assemblePublicKey(input.getScriptPubKey()));
     }
 
     public static boolean isOutputSpent(byte[] refOut, int outIndex) {
