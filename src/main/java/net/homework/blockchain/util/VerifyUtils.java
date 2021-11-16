@@ -8,9 +8,6 @@ import net.homework.blockchain.sql.dao.TxDao;
 import net.homework.blockchain.sql.dao.impl.BlockDaoImpl;
 import net.homework.blockchain.sql.dao.impl.TxDaoImpl;
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
@@ -37,8 +34,13 @@ public class VerifyUtils {
         return ByteUtils.isZero(input.getPreviousTransactionHash()) && input.getOutIndex() == -1;
     }
 
-    public static boolean isCoinbaseMature(Transaction refOutTx) {
+    public static boolean isCoinbaseTxMature(Transaction coinbaseTx) {
         // TODO
+        // use txhash to search in tx table, find tx
+        // find tx's block hash
+        // find that block's height
+        // find the current block height
+        // return if current height - block height >= maturity
         return false;
     }
 
@@ -146,7 +148,7 @@ public class VerifyUtils {
                 return true;
             } else {
                 // if the referenced output is coinbase, it must be matured, or we reject it
-                if (isCoinbaseTx(refOutTx) && !isCoinbaseMature(refOutTx)) {
+                if (isCoinbaseTx(refOutTx) && !isCoinbaseTxMature(refOutTx)) {
                     return false;
                 }
                 // if the referenced output is spent, reject it
@@ -180,18 +182,7 @@ public class VerifyUtils {
         txPool.put(txHash, tx);
 
         // Broadcast transaction to nodes
-        new Thread(() -> {
-            try {
-                DatagramSocket socket = new DatagramSocket(Config.PORT_TX_BROADCAST_OUT, InetAddress.getLocalHost());
-                socket.setBroadcast(true);
-                byte[] data = tx.toBytes();
-                DatagramPacket packet = new DatagramPacket(data, data.length, InetAddress.getByName("255.255.255.255"), Config.PORT_TX_BROADCAST_IN);
-                socket.send(packet);
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
+        NetworkUtils.broadcast(Config.PORT_TX_BROADCAST_OUT, tx.toBytes(), Config.PORT_TX_BROADCAST_IN);
 
         // TODO: send new tx in pool (txHash/tx) to miners
 
@@ -287,7 +278,7 @@ public class VerifyUtils {
                                 (refOutTx.getOutputs().size() <= outIndex) ||
                                 // if the referenced output transaction is coinbase (i.e. only 1 input, with hash=0, n=-1),
                                 // it must have at least COINBASE_MATURITY (10) confirmations; else reject.
-                                (isCoinbaseTx(refOutTx) && !isCoinbaseMature(refOutTx)) ||
+                                (isCoinbaseTx(refOutTx) && !isCoinbaseTxMature(refOutTx)) ||
                                 // Verify crypto signatures for each input; reject if any are bad
                                 (!verifyInput(input)) ||
                                 // Verify crypto signatures for each input; reject if any are bad
@@ -321,9 +312,10 @@ public class VerifyUtils {
                 txs.forEach(tx -> txPool.remove(tx.hashTransaction()));
                 // TODO: send updated tx pool to miners (which txs are no longer in pool)
 
-                // TODO: Add to chain
-                // TODO: Broadcast block to our peers
-
+                // Add to chain
+                blockDao.addBlock(block);
+                // Broadcast block to our peers
+                NetworkUtils.broadcast(Config.PORT_BLOCK_BROADCAST_OUT, block.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
 
                 // For each orphan block for which this block is its prev, run all these steps (including this one) recursively on that orphan
                 orphanBlocks.values().forEach(orphanBlock -> {

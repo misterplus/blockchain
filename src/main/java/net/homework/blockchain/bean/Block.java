@@ -46,6 +46,10 @@ public class Block {
         this.header.merkleTree = new MerkleTree(tree);
     }
 
+    public byte[] toBytes() {
+        return ByteUtils.toBytes(this);
+    }
+
     public byte[] hashHeader() {
         return CryptoUtils.sha256Twice(ByteUtils.toBytes(header));
     }
