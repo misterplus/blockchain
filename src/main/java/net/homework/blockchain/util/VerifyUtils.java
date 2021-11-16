@@ -52,8 +52,10 @@ public class VerifyUtils {
         return CryptoUtils.verifyTransaction(input.getPreviousTransactionHash(), input.getScriptSig(), CryptoUtils.assemblePublicKey(input.getScriptPubKey()));
     }
 
-    public static boolean isOutputSpent(byte[] refOut, int outIndex) {
+    public static boolean isOutputSpentOnChain(byte[] refOut, int outIndex) {
         // TODO
+        // use refOut and outIndex to search in input table
+        // return true if found (an input has already used this output, thus spending it)
         return false;
     }
 
@@ -151,8 +153,8 @@ public class VerifyUtils {
                 if (isCoinbaseTx(refOutTx) && !isCoinbaseTxMature(refOutTx)) {
                     return false;
                 }
-                // if the referenced output is spent, reject it
-                if (isOutputSpent(refOut, outIndex)) {
+                // if the referenced output is spent on chain, reject it
+                if (isOutputSpentOnChain(refOut, outIndex)) {
                     return false;
                 }
                 /*
@@ -191,7 +193,7 @@ public class VerifyUtils {
             run all these steps (including this one) recursively on that orphan.
          */
         for (Transaction orphan : orphanTxs.values()) {
-            if (orphan.getInputs().stream().anyMatch(input -> isTxSpentByInput(orphan, input))) {
+            if (orphan.getInputs().stream().anyMatch(input -> isTxSpentByInput(tx, input))) {
                 verifyTx(orphan, txPool, orphanTxs);
             }
         }
@@ -207,7 +209,7 @@ public class VerifyUtils {
         if (block == null) {
             return false;
         }
-        byte[] headerHash = block.hashHeader();
+        byte[] headerHash = block.getHash();
         // if it's a orphan who found parents, remove it from orphan pool
         orphanBlocks.remove(headerHash);
         List<Transaction> txs = block.getTransactions();
@@ -253,7 +255,7 @@ public class VerifyUtils {
             // TODO: then query peer we got this from for orphan's parent;
         } else {
             // if prevBlock already has a son, we reject this block completely (no multi-branch implementation for simplicity reasons)
-            if (!blockDao.isSonPresentForParentBlock(prevBlock.hashHeader())) {
+            if (!blockDao.isSonPresentForParentBlock(prevBlock.getHash())) {
                 // if prevBlock has no son, continue
                 byte[] refOut;
                 Transaction refOutTx;
@@ -264,6 +266,7 @@ public class VerifyUtils {
                 outSumIter.next();
                 long minerFeeSum = 0L;
                 long minerFee;
+                Map<byte[], List<Integer>> spentOutputInBlock = new HashMap<>();
                 // For all but the coinbase transaction, apply the following:
                 for (Transaction tx : txs.subList(1, txs.size())) {
                     // For each input, look in the main branch to find the referenced output transaction.
@@ -281,8 +284,10 @@ public class VerifyUtils {
                                 (isCoinbaseTx(refOutTx) && !isCoinbaseTxMature(refOutTx)) ||
                                 // Verify crypto signatures for each input; reject if any are bad
                                 (!verifyInput(input)) ||
-                                // Verify crypto signatures for each input; reject if any are bad
-                                (isOutputSpent(refOut, outIndex))) {
+                                // if the referenced output is spent on chain, reject it
+                                (isOutputSpentOnChain(refOut, outIndex)) ||
+                                // if the referenced output is spent by any other transaction in this block, reject this block
+                                (spentOutputInBlock.containsKey(refOut) && spentOutputInBlock.get(refOut).contains(outIndex))) {
                             return false;
                         }
                         // Using the referenced output transactions to get input values,
@@ -292,6 +297,14 @@ public class VerifyUtils {
                             return false;
                         } else {
                             inputSum += inputValue;
+                        }
+                        // update the spent list
+                        if (spentOutputInBlock.containsKey(refOut)) {
+                            // refOut duplicated, add the index to value list
+                            spentOutputInBlock.get(refOut).add(outIndex);
+                        } else {
+                            // refOut new, get a new list
+                            spentOutputInBlock.put(refOut, Collections.singletonList(outIndex));
                         }
                     }
                     if (isMoneyValueIllegal(inputSum)) {

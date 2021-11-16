@@ -7,7 +7,11 @@ import lombok.NoArgsConstructor;
 import net.homework.blockchain.Config;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
+import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.NaturalId;
 
+import javax.persistence.*;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -15,8 +19,27 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Entity
+@Immutable
 public class Block {
+
+    @JsonIgnore
+    private byte[] hash;
+
+    @Id
+    public byte[] getHash() {
+        return hashHeader();
+    }
+
+    @JsonIgnore
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    // block height
+    private long height;
+
     private Header header;
+
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Transaction> transactions;
     public Block(byte[] hashPrevBlock, List<Transaction> transactions) {
         ArrayList<byte[]> tree = new ArrayList<>();
@@ -50,10 +73,11 @@ public class Block {
         return ByteUtils.toBytes(this);
     }
 
-    public byte[] hashHeader() {
-        return CryptoUtils.sha256Twice(ByteUtils.toBytes(header));
+    private byte[] hashHeader() {
+        return header.hashHeader();
     }
 
+    @Transient
     private boolean isBlockValid() {
         return ByteUtils.isZero(Arrays.copyOf(hashHeader(), header.difficulty));
     }
@@ -61,7 +85,11 @@ public class Block {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class Header {
+    @Embeddable
+    @Immutable
+    public static class Header implements Serializable {
+        private static final long serialVersionUID = 0L;
+
         // hash of the previous block header
         private byte[] hashPrevBlock;
         // hash based on all of the transactions in the block
@@ -69,13 +97,17 @@ public class Block {
         // UTC timestamp
         private long time;
         // difficulty of the network
-        private final int difficulty = Config.DIFFICULTY;
+        private int difficulty = Config.DIFFICULTY;
         // for calculating the hash of this block
         private int nonce = 0;
 
-        // not present if received from network
         @JsonIgnore
-        private MerkleTree merkleTree;
+        private transient MerkleTree merkleTree;
+
+        @Transient // do not store in db
+        public MerkleTree getMerkleTree() {
+            return merkleTree;
+        }
 
         public Header(byte[] hashPrevBlock, MerkleTree merkleTree) {
             this.hashPrevBlock = hashPrevBlock;
@@ -99,9 +131,11 @@ public class Block {
             this.merkleTree.addHash(tx);
             this.updateMerkleRoot(this.merkleTree.hashMerkleTree());
         }
+
+        private byte[] hashHeader() {
+            return CryptoUtils.sha256Twice(ByteUtils.toBytes(this));
+        }
     }
-
-
 
     /**
      * Mining:
