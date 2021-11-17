@@ -6,9 +6,10 @@ import net.homework.blockchain.sql.repo.InputRepository;
 import net.homework.blockchain.sql.repo.TransactionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
+import org.springframework.stereotype.Service;
 
-@Controller
-public class BlockchainController {
+@Service
+public class BlockchainService {
     @Autowired
     private BlockRepository blockRepository;
     @Autowired
