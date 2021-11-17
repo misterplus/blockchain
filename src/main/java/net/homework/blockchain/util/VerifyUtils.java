@@ -8,6 +8,7 @@ import net.homework.blockchain.service.BlockchainService;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.stream.LongStream;
 
@@ -72,7 +73,7 @@ public class VerifyUtils {
         return outputSum;
     }
 
-    public static boolean verifyTx(Transaction tx, Map<byte[], Transaction> txPool, Map<byte[], Transaction> orphanTxs) {
+    public static boolean verifyTx(Transaction tx, Map<ByteBuffer, Transaction> txPool, Map<ByteBuffer, Transaction> orphanTxs) {
         // Check syntactic correctness
         if (tx == null) {
             return false;
@@ -91,8 +92,8 @@ public class VerifyUtils {
         // Reject if we already have matching tx in the pool, or in a block in the main branch
         byte[] txHash = tx.hashTransaction();
         // if it's a orphan who found parents, remove it from orphan pool
-        orphanTxs.remove(txHash);
-        if (txPool.containsKey(txHash) || blockchainService.getTransaction(txHash) != null) {
+        orphanTxs.remove(ByteBuffer.wrap(txHash));
+        if (txPool.containsKey(ByteBuffer.wrap(txHash)) || blockchainService.getTransaction(txHash) != null) {
             return false;
         }
         byte[] refOut;
@@ -125,7 +126,7 @@ public class VerifyUtils {
             }
             // add to the orphan txs if is orphan
             if (refOutTx == null) {
-                orphanTxs.putIfAbsent(tx.hashTransaction(), tx);
+                orphanTxs.putIfAbsent(ByteBuffer.wrap(tx.hashTransaction()), tx);
                 // TODO: remove orphanTxs who stayed too long?
                 return true;
             } else {
@@ -161,7 +162,7 @@ public class VerifyUtils {
         }
 
         // Add to transaction pool
-        txPool.put(txHash, tx);
+        txPool.put(ByteBuffer.wrap(txHash), tx);
 
         // Broadcast transaction to nodes
         NetworkUtils.broadcast(Config.PORT_TX_BROADCAST_OUT, tx.toBytes(), Config.PORT_TX_BROADCAST_IN);
@@ -184,14 +185,14 @@ public class VerifyUtils {
         return input.getPreviousTransactionHash() == tx.hashTransaction() && tx.getOutputs().size() > input.getOutIndex();
     }
 
-    public static boolean verifyBlock(Block block, InetAddress fromPeer, Map<byte[], Block> orphanBlocks, Map<byte[], Transaction> txPool) {
+    public static boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, Transaction> txPool) {
         // Check syntactic correctness
         if (block == null) {
             return false;
         }
         byte[] headerHash = block.hashHeader();
         // if it's a orphan who found parents, remove it from orphan pool
-        orphanBlocks.remove(headerHash);
+        orphanBlocks.remove(ByteBuffer.wrap(headerHash));
         List<Transaction> txs = block.getTransactions();
         // Reject if block is duplicated
         // Transaction list must be non-empty
@@ -231,7 +232,7 @@ public class VerifyUtils {
         Block prevBlock = blockchainService.getBlock(header.getHashPrevBlock());
         if (prevBlock == null) {
             // orphan block, add this to orphan blocks
-            orphanBlocks.put(headerHash, block);
+            orphanBlocks.put(ByteBuffer.wrap(headerHash), block);
             // TODO: then query peer we got this from for orphan's parent;
         } else {
             // if prevBlock already has a son, we reject this block completely (no multi-branch implementation for simplicity reasons)
@@ -246,7 +247,7 @@ public class VerifyUtils {
                 outSumIter.next();
                 long minerFeeSum = 0L;
                 long minerFee;
-                Map<byte[], List<Integer>> spentOutputInBlock = new HashMap<>();
+                Map<ByteBuffer, List<Integer>> spentOutputInBlock = new HashMap<>();
                 // For all but the coinbase transaction, apply the following:
                 for (Transaction tx : txs.subList(1, txs.size())) {
                     // For each input, look in the main branch to find the referenced output transaction.
@@ -267,7 +268,7 @@ public class VerifyUtils {
                                 // if the referenced output is spent on chain, reject it
                                 (blockchainService.isOutputSpentOnChain(refOut, outIndex)) ||
                                 // if the referenced output is spent by any other transaction in this block, reject this block
-                                (spentOutputInBlock.containsKey(refOut) && spentOutputInBlock.get(refOut).contains(outIndex))) {
+                                (spentOutputInBlock.containsKey(ByteBuffer.wrap(refOut)) && spentOutputInBlock.get(ByteBuffer.wrap(refOut)).contains(outIndex))) {
                             return false;
                         }
                         // Using the referenced output transactions to get input values,
@@ -279,12 +280,12 @@ public class VerifyUtils {
                             inputSum += inputValue;
                         }
                         // update the spent list
-                        if (spentOutputInBlock.containsKey(refOut)) {
+                        if (spentOutputInBlock.containsKey(ByteBuffer.wrap(refOut))) {
                             // refOut duplicated, add the index to value list
-                            spentOutputInBlock.get(refOut).add(outIndex);
+                            spentOutputInBlock.get(ByteBuffer.wrap(refOut)).add(outIndex);
                         } else {
                             // refOut new, get a new list
-                            spentOutputInBlock.put(refOut, Collections.singletonList(outIndex));
+                            spentOutputInBlock.put(ByteBuffer.wrap(refOut), Collections.singletonList(outIndex));
                         }
                     }
                     if (isMoneyValueIllegal(inputSum)) {
@@ -302,7 +303,7 @@ public class VerifyUtils {
                     return false;
                 }
                 // For each transaction in the block, delete any matching transaction from the transaction pool
-                txs.forEach(tx -> txPool.remove(tx.hashTransaction()));
+                txs.forEach(tx -> txPool.remove(ByteBuffer.wrap(tx.hashTransaction())));
                 // TODO: send updated tx pool to miners (which txs are no longer in pool)
 
                 // Add to chain

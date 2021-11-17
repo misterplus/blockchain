@@ -2,6 +2,8 @@ package net.homework.blockchain.client;
 
 import net.homework.blockchain.entity.Transaction;
 
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
 
 public interface User {
@@ -13,11 +15,11 @@ public interface User {
      * @param recipientsWithAmount publicKeyHash, value
      * @return the assembled transaction
      */
-    Transaction assembleTx(Map<byte[], byte[]> recipientsWithAmount);
+    Transaction assembleTx(Map<ByteBuffer, byte[]> recipientsWithAmount);
     void broadcastTx(Transaction tx);
     /**
      * Get unspent transaction outputs.
      * @return transactionHash, outIndex
      */
-    Map<Transaction, Integer> getUTXOs();
+    Map<ByteBuffer, List<Integer>> getUTXOs();
 }

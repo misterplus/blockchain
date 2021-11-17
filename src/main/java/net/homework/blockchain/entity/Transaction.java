@@ -6,7 +6,6 @@ import lombok.NoArgsConstructor;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.binary.Hex;
-import org.hibernate.annotations.Immutable;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -16,37 +15,41 @@ import java.util.List;
 @Data
 @Entity
 public class Transaction {
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderColumn(name = "input_index_in_tx")
-    private List<Input> inputs;
 
+    private List<Input> inputs;
+    private List<Output> outputs;
+
+    // we use eager here cause everytime we fetch a transaction we would always need these lists
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderColumn(name = "input_index_in_tx")
     public List<Input> getInputs() {
         return inputs;
     }
-
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderColumn(name = "output_index_in_tx")
     public List<Output> getOutputs() {
         return outputs;
     }
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderColumn(name = "output_index_in_tx")
-    private List<Output> outputs;
 
     @JsonIgnore
-    @Id
-    @Column(length = 64)
-    private String hashTx;
+    private byte[] hashTx;
 
-    // TODO: it hashes this object before loading inputs & outputs
-    @PrePersist
-    private void preSave() {
-        this.hashTx = Hex.encodeHexString(hashTransaction(), false);
+    @JsonIgnore
+    private int dummyId;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    public int getDummyId() {
+        return dummyId;
+    }
+
+    @Column(length = 256)
+    public byte[] getHashTx() {
+        return hashTransaction();
     }
 
     /**
      * Construct a normal transaction.
-     *
-     * @param inputs
-     * @param outputs
      */
     public Transaction(List<Input> inputs, List<Output> outputs) {
         this.inputs = inputs;
@@ -63,8 +66,7 @@ public class Transaction {
 
     @Data
     @Entity
-    public static class Input implements Serializable {
-        private static final long serialVersionUID = 1L;
+    public static class Input {
 
         private byte[] previousTransactionHash;
         private int outIndex;

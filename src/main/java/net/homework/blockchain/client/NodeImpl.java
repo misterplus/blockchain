@@ -9,17 +9,18 @@ import net.homework.blockchain.util.VerifyUtils;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
 public class NodeImpl implements Node {
 
     // valid txs, to be processed by a miner
-    public static Map<byte[], Transaction> TX_POOL = new HashMap<>();
+    public static Map<ByteBuffer, Transaction> TX_POOL = new HashMap<>();
     // because udp packets won't arrive in order, there'll be orphan transactions, waiting to be claimed by other txs
-    public static Map<byte[], Transaction> ORPHAN_TXS = new HashMap<>();
+    public static Map<ByteBuffer, Transaction> ORPHAN_TXS = new HashMap<>();
     // orphan blocks
-    public static Map<byte[], Block> ORPHAN_BLOCKS = new HashMap<>();
+    public static Map<ByteBuffer, Block> ORPHAN_BLOCKS = new HashMap<>();
 
     @Override
     public void listenForTransaction() {

@@ -40,7 +40,7 @@ public class Block {
     private Header header;
 
     private List<Transaction> transactions;
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderColumn(name = "index_in_block")
     public List<Transaction> getTransactions() {
         return transactions;
@@ -52,8 +52,7 @@ public class Block {
             tree.add(tx.hashTransaction());
         }
         MerkleTree merkleTree = new MerkleTree(tree);
-        Block.Header header = new Header(hashPrevBlock, merkleTree);
-        this.header = header;
+        this.header = new Header(hashPrevBlock, merkleTree);
         this.transactions = transactions;
     }
 
@@ -142,11 +141,11 @@ public class Block {
         }
     }
 
-    /**
-     * Mining:
-     *  construct a new block, add txs
-     *  while block is not valid
-     *      increment()
-     *  send to node
+    /*
+      Mining:
+       construct a new block, add txs
+       while block is not valid
+           increment()
+       send to node
      */
 }

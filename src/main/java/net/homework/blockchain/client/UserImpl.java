@@ -11,10 +11,12 @@ import org.bouncycastle.jce.interfaces.ECPublicKey;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jce.spec.ECParameterSpec;
 
+import java.nio.ByteBuffer;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Security;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import static net.homework.blockchain.util.ByteUtils.removeLeadingZero;
@@ -95,7 +97,7 @@ public class UserImpl implements User {
     }
 
     @Override
-    public Transaction assembleTx(Map<byte[], byte[]> recipientsWithAmount) {
+    public Transaction assembleTx(Map<ByteBuffer, byte[]> recipientsWithAmount) {
         return null;
     }
 
@@ -105,7 +107,7 @@ public class UserImpl implements User {
     }
 
     @Override
-    public Map<Transaction, Integer> getUTXOs() {
+    public Map<ByteBuffer, List<Integer>> getUTXOs() {
         return null;
     }
 }
