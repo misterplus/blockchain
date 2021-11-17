@@ -1,4 +1,4 @@
-package net.homework.blockchain.bean;
+package net.homework.blockchain.entity;
 
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;

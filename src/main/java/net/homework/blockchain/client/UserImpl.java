@@ -2,7 +2,7 @@ package net.homework.blockchain.client;
 
 import io.leonard.Base58;
 import lombok.SneakyThrows;
-import net.homework.blockchain.bean.Transaction;
+import net.homework.blockchain.entity.Transaction;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.binary.Hex;
 import org.bouncycastle.jce.ECNamedCurveTable;

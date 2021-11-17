@@ -1,6 +1,6 @@
-package net.homework.blockchain.sql.repo;
+package net.homework.blockchain.repo;
 
-import net.homework.blockchain.bean.Transaction;
+import net.homework.blockchain.entity.Transaction;
 import org.springframework.data.repository.CrudRepository;
 
 import java.util.Optional;

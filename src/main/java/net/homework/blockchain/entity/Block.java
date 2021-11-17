@@ -1,4 +1,4 @@
-package net.homework.blockchain.bean;
+package net.homework.blockchain.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;

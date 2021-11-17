@@ -1,8 +1,8 @@
 package net.homework.blockchain.client;
 
 import net.homework.blockchain.Config;
-import net.homework.blockchain.bean.Block;
-import net.homework.blockchain.bean.Transaction;
+import net.homework.blockchain.entity.Block;
+import net.homework.blockchain.entity.Transaction;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.VerifyUtils;
 

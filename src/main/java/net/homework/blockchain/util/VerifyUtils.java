@@ -1,12 +1,10 @@
 package net.homework.blockchain.util;
 
 import net.homework.blockchain.Config;
-import net.homework.blockchain.bean.Block;
-import net.homework.blockchain.bean.Transaction;
-import net.homework.blockchain.sql.dao.BlockDao;
-import net.homework.blockchain.sql.dao.TxDao;
-import net.homework.blockchain.sql.dao.impl.BlockDaoImpl;
-import net.homework.blockchain.sql.dao.impl.TxDaoImpl;
+import net.homework.blockchain.SpringContext;
+import net.homework.blockchain.entity.Block;
+import net.homework.blockchain.entity.Transaction;
+import net.homework.blockchain.service.BlockchainService;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -15,8 +13,7 @@ import java.util.stream.LongStream;
 
 public class VerifyUtils {
 
-    private static final TxDao txDao = new TxDaoImpl();
-    private static final BlockDao blockDao = new BlockDaoImpl();
+    private static final BlockchainService blockchainService = SpringContext.getBean(BlockchainService.class);
 
     public static boolean isListEmpty(List<?> list) {
         return list == null || list.isEmpty();
@@ -34,29 +31,12 @@ public class VerifyUtils {
         return ByteUtils.isZero(input.getPreviousTransactionHash()) && input.getOutIndex() == -1;
     }
 
-    public static boolean isCoinbaseTxMature(Transaction coinbaseTx) {
-        // TODO
-        // use txhash to search in tx table, find tx
-        // find tx's block hash
-        // find that block's height
-        // find the current block height
-        // return if current height - block height >= maturity
-        return false;
-    }
-
     public static boolean isOutputPresentInTx(Transaction toCheck, byte[] refOut, int outIndex) {
         return toCheck.hashTransaction() == refOut && toCheck.getOutputs().size() > outIndex;
     }
 
     public static boolean verifyInput(Transaction.Input input) {
         return CryptoUtils.verifyTransaction(input.getPreviousTransactionHash(), input.getScriptSig(), CryptoUtils.assemblePublicKey(input.getScriptPubKey()));
-    }
-
-    public static boolean isOutputSpentOnChain(byte[] refOut, int outIndex) {
-        // TODO
-        // use refOut and outIndex to search in input table
-        // return true if found (an input has already used this output, thus spending it)
-        return false;
     }
 
     public static boolean isMoneyValueIllegal(long value) {
@@ -112,7 +92,7 @@ public class VerifyUtils {
         byte[] txHash = tx.hashTransaction();
         // if it's a orphan who found parents, remove it from orphan pool
         orphanTxs.remove(txHash);
-        if (txPool.containsKey(txHash) || txDao.getTx(txHash) != null) {
+        if (txPool.containsKey(txHash) || blockchainService.getTransaction(txHash) != null) {
             return false;
         }
         byte[] refOut;
@@ -140,7 +120,7 @@ public class VerifyUtils {
             }
             // if it's still orphan, try to find the referenced output on-chain, if found, it's not orphan
             if (refOutTx == null) {
-                Transaction findOnChain = txDao.getTx(refOut);
+                Transaction findOnChain = blockchainService.getTransaction(refOut);
                 refOutTx = findOnChain != null && isOutputPresentInTx(findOnChain, refOut, outIndex) ? findOnChain : null;
             }
             // add to the orphan txs if is orphan
@@ -150,11 +130,11 @@ public class VerifyUtils {
                 return true;
             } else {
                 // if the referenced output is coinbase, it must be matured, or we reject it
-                if (isCoinbaseTx(refOutTx) && !isCoinbaseTxMature(refOutTx)) {
+                if (isCoinbaseTx(refOutTx) && !blockchainService.isCoinbaseTxMature(refOutTx.hashTransaction())) {
                     return false;
                 }
                 // if the referenced output is spent on chain, reject it
-                if (isOutputSpentOnChain(refOut, outIndex)) {
+                if (blockchainService.isOutputSpentOnChain(refOut, outIndex)) {
                     return false;
                 }
                 /*
@@ -216,7 +196,7 @@ public class VerifyUtils {
         // Reject if block is duplicated
         // Transaction list must be non-empty
         // Block hash must satisfy claimed nBits proof of work, matching the difficulty
-        if (blockDao.getBlock(headerHash) != null || isListEmpty(txs) || !ByteUtils.isZero(Arrays.copyOf(headerHash, Config.DIFFICULTY))) {
+        if (blockchainService.getBlock(headerHash) != null || isListEmpty(txs) || !ByteUtils.isZero(Arrays.copyOf(headerHash, Config.DIFFICULTY))) {
             return false;
         }
         Block.Header header = block.getHeader();
@@ -248,14 +228,14 @@ public class VerifyUtils {
             return false;
         }
         // Check if prev block is on-chain.
-        Block prevBlock = blockDao.getBlock(header.getHashPrevBlock());
+        Block prevBlock = blockchainService.getBlock(header.getHashPrevBlock());
         if (prevBlock == null) {
             // orphan block, add this to orphan blocks
             orphanBlocks.put(headerHash, block);
             // TODO: then query peer we got this from for orphan's parent;
         } else {
             // if prevBlock already has a son, we reject this block completely (no multi-branch implementation for simplicity reasons)
-            if (!blockDao.isSonPresentForParentBlock(prevBlock.hashHeader())) {
+            if (!blockchainService.isSonPresentForParentBlock(prevBlock.hashHeader())) {
                 // if prevBlock has no son, continue
                 byte[] refOut;
                 Transaction refOutTx;
@@ -273,7 +253,7 @@ public class VerifyUtils {
                     long inputSum = 0L;
                     for (Transaction.Input input : tx.getInputs()) {
                         refOut = input.getPreviousTransactionHash();
-                        refOutTx = txDao.getTx(refOut);
+                        refOutTx = blockchainService.getTransaction(refOut);
                         outIndex = input.getOutIndex();
                         // Reject if the output transaction is missing for any input.
                         if ((refOutTx == null) ||
@@ -281,11 +261,11 @@ public class VerifyUtils {
                                 (refOutTx.getOutputs().size() <= outIndex) ||
                                 // if the referenced output transaction is coinbase (i.e. only 1 input, with hash=0, n=-1),
                                 // it must have at least COINBASE_MATURITY (10) confirmations; else reject.
-                                (isCoinbaseTx(refOutTx) && !isCoinbaseTxMature(refOutTx)) ||
+                                (isCoinbaseTx(refOutTx) && !blockchainService.isCoinbaseTxMature(refOutTx.hashTransaction())) ||
                                 // Verify crypto signatures for each input; reject if any are bad
                                 (!verifyInput(input)) ||
                                 // if the referenced output is spent on chain, reject it
-                                (isOutputSpentOnChain(refOut, outIndex)) ||
+                                (blockchainService.isOutputSpentOnChain(refOut, outIndex)) ||
                                 // if the referenced output is spent by any other transaction in this block, reject this block
                                 (spentOutputInBlock.containsKey(refOut) && spentOutputInBlock.get(refOut).contains(outIndex))) {
                             return false;
@@ -326,7 +306,7 @@ public class VerifyUtils {
                 // TODO: send updated tx pool to miners (which txs are no longer in pool)
 
                 // Add to chain
-                blockDao.addBlock(block);
+                blockchainService.addBlock(block);
                 // Broadcast block to our peers
                 NetworkUtils.broadcast(Config.PORT_BLOCK_BROADCAST_OUT, block.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
 

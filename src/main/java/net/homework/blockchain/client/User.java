@@ -1,6 +1,6 @@
 package net.homework.blockchain.client;
 
-import net.homework.blockchain.bean.Transaction;
+import net.homework.blockchain.entity.Transaction;
 
 import java.util.Map;
 
