@@ -5,8 +5,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
+@EntityScan("net.homework.blockchain.entity")
 @EnableJpaRepositories("net.homework.blockchain.repo")
-@EntityScan("net.homework.blockchain.bean")
 @SpringBootApplication
 public class BlockchainApplication {
 

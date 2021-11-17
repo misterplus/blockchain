@@ -15,32 +15,31 @@ import java.util.List;
 @NoArgsConstructor
 @Data
 @Entity
-@Immutable
 public class Transaction {
-
-
-    private List<Input> inputs;
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderColumn(name = "input_index_in_tx")
+    private List<Input> inputs;
+
     public List<Input> getInputs() {
         return inputs;
     }
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderColumn(name = "output_index_in_tx")
+
     public List<Output> getOutputs() {
         return outputs;
     }
-
-
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderColumn(name = "output_index_in_tx")
     private List<Output> outputs;
 
     @JsonIgnore
-    private String hashTx;
-
     @Id
     @Column(length = 64)
-    public String getHashTx() {
-        return Hex.encodeHexString(hashTransaction(), false);
+    private String hashTx;
+
+    // TODO: it hashes this object before loading inputs & outputs
+    @PrePersist
+    private void preSave() {
+        this.hashTx = Hex.encodeHexString(hashTransaction(), false);
     }
 
     /**
@@ -64,7 +63,6 @@ public class Transaction {
 
     @Data
     @Entity
-    @Immutable
     public static class Input implements Serializable {
         private static final long serialVersionUID = 1L;
 
@@ -72,6 +70,10 @@ public class Transaction {
         private int outIndex;
         private byte[] scriptSig;
         private byte[] scriptPubKey;
+
+        public void incrementExtraNonce() {
+            outIndex++;
+        }
 
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -105,7 +107,6 @@ public class Transaction {
     @NoArgsConstructor
     @Data
     @Entity
-    @Immutable
     public static class Output {
         private long value;
         private byte[] scriptPubKeyHash;

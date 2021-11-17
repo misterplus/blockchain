@@ -9,6 +9,7 @@ import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.binary.Hex;
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.NaturalId;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -20,7 +21,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Immutable
 public class Block {
 
     @JsonIgnore
@@ -38,7 +38,6 @@ public class Block {
     private long height;
 
     private Header header;
-
 
     private List<Transaction> transactions;
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
@@ -84,15 +83,22 @@ public class Block {
     }
 
     @Transient
-    private boolean isBlockValid() {
+    @JsonIgnore
+    public boolean isBlockValid() {
         return ByteUtils.isZero(Arrays.copyOf(hashHeader(), header.difficulty));
+    }
+
+    public void increment() {
+        if (++this.header.nonce == 0) {
+            transactions.get(0).getInputs().get(0).incrementExtraNonce();
+        }
+        this.header.time = System.currentTimeMillis();
     }
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     @Embeddable
-    @Immutable
     public static class Header implements Serializable {
         private static final long serialVersionUID = 0L;
 
@@ -119,13 +125,6 @@ public class Block {
             this.hashPrevBlock = hashPrevBlock;
             this.merkleTree = merkleTree;
             this.hashMerkleRoot = merkleTree.hashMerkleTree();
-            this.time = System.currentTimeMillis();
-        }
-
-        public void increment() {
-            if (++nonce == 0) {
-                // increment extraNonce
-            }
             this.time = System.currentTimeMillis();
         }
 
