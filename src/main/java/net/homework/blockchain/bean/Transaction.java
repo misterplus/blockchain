@@ -5,12 +5,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
+import org.apache.commons.codec.binary.Hex;
 import org.hibernate.annotations.Immutable;
 
-import javax.persistence.CascadeType;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.OneToMany;
+import javax.persistence.*;
+import java.io.Serializable;
 import java.util.List;
 
 @NoArgsConstructor
@@ -19,21 +18,33 @@ import java.util.List;
 @Immutable
 public class Transaction {
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+
     private List<Input> inputs;
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderColumn(name = "input_index_in_tx")
+    public List<Input> getInputs() {
+        return inputs;
+    }
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderColumn(name = "output_index_in_tx")
+    public List<Output> getOutputs() {
+        return outputs;
+    }
+
+
     private List<Output> outputs;
 
     @JsonIgnore
-    private byte[] hash;
+    private String hashTx;
 
     @Id
-    public byte[] getHash() {
-        return hashTransaction();
+    @Column(length = 64)
+    public String getHashTx() {
+        return Hex.encodeHexString(hashTransaction(), false);
     }
 
     /**
-     * Construct a normal transaction, do not initialize extraNonce.
+     * Construct a normal transaction.
      *
      * @param inputs
      * @param outputs
@@ -51,18 +62,21 @@ public class Transaction {
         return ByteUtils.toBytes(this);
     }
 
-    public void preSave() {
-        this.hash = hashTransaction();
-    }
-
     @Data
     @Entity
     @Immutable
-    public static class Input {
+    public static class Input implements Serializable {
+        private static final long serialVersionUID = 1L;
+
         private byte[] previousTransactionHash;
         private int outIndex;
         private byte[] scriptSig;
         private byte[] scriptPubKey;
+
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        @JsonIgnore
+        private int dummyId;
 
         /**
          * @param previousTransactionHash previous tx to redeem
@@ -95,6 +109,11 @@ public class Transaction {
     public static class Output {
         private long value;
         private byte[] scriptPubKeyHash;
+
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        @JsonIgnore
+        private int dummyId;
 
         /**
          * @param value            amount of coins to be sent

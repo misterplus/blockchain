@@ -7,8 +7,8 @@ import lombok.NoArgsConstructor;
 import net.homework.blockchain.Config;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
+import org.apache.commons.codec.binary.Hex;
 import org.hibernate.annotations.Immutable;
-import org.hibernate.annotations.NaturalId;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -24,23 +24,29 @@ import java.util.List;
 public class Block {
 
     @JsonIgnore
-    private byte[] hash;
+    private String hashBlock;
 
     @Id
-    public byte[] getHash() {
-        return hashHeader();
+    @Column(length = 64)
+    public String getHashBlock() {
+        return Hex.encodeHexString(hashHeader(), false);
     }
 
     @JsonIgnore
-    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     // block height
     private long height;
 
     private Header header;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+
     private List<Transaction> transactions;
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderColumn(name = "index_in_block")
+    public List<Transaction> getTransactions() {
+        return transactions;
+    }
+
     public Block(byte[] hashPrevBlock, List<Transaction> transactions) {
         ArrayList<byte[]> tree = new ArrayList<>();
         for (Transaction tx : transactions) {
@@ -73,7 +79,7 @@ public class Block {
         return ByteUtils.toBytes(this);
     }
 
-    private byte[] hashHeader() {
+    public byte[] hashHeader() {
         return header.hashHeader();
     }
 

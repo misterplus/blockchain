@@ -209,7 +209,7 @@ public class VerifyUtils {
         if (block == null) {
             return false;
         }
-        byte[] headerHash = block.getHash();
+        byte[] headerHash = block.hashHeader();
         // if it's a orphan who found parents, remove it from orphan pool
         orphanBlocks.remove(headerHash);
         List<Transaction> txs = block.getTransactions();
@@ -255,7 +255,7 @@ public class VerifyUtils {
             // TODO: then query peer we got this from for orphan's parent;
         } else {
             // if prevBlock already has a son, we reject this block completely (no multi-branch implementation for simplicity reasons)
-            if (!blockDao.isSonPresentForParentBlock(prevBlock.getHash())) {
+            if (!blockDao.isSonPresentForParentBlock(prevBlock.hashHeader())) {
                 // if prevBlock has no son, continue
                 byte[] refOut;
                 Transaction refOutTx;

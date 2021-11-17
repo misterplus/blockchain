@@ -2,6 +2,7 @@ package net.homework.blockchain.sql.dao.impl;
 
 import net.homework.blockchain.bean.Block;
 import net.homework.blockchain.sql.dao.BlockDao;
+import net.homework.blockchain.sql.repo.BlockRepository;
 
 public class BlockDaoImpl implements BlockDao {
     @Override
