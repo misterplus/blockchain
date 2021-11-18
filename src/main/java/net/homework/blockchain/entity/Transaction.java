@@ -5,10 +5,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
-import org.apache.commons.codec.binary.Hex;
 
 import javax.persistence.*;
-import java.io.Serializable;
 import java.util.List;
 
 @NoArgsConstructor
@@ -35,15 +33,14 @@ public class Transaction {
     private byte[] hashTx;
 
     @JsonIgnore
-    private int dummyId;
+    private long dummyId;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    public int getDummyId() {
+    public long getDummyId() {
         return dummyId;
     }
 
-    @Column(length = 256)
     public byte[] getHashTx() {
         return hashTransaction();
     }
@@ -80,7 +77,7 @@ public class Transaction {
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         @JsonIgnore
-        private int dummyId;
+        private long dummyId;
 
         /**
          * @param previousTransactionHash previous tx to redeem
@@ -116,7 +113,7 @@ public class Transaction {
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         @JsonIgnore
-        private int dummyId;
+        private long dummyId;
 
         /**
          * @param value            amount of coins to be sent

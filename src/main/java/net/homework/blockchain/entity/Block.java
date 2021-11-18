@@ -5,15 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import net.homework.blockchain.Config;
-import net.homework.blockchain.SpringContext;
-import net.homework.blockchain.service.BlockchainService;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
-import org.apache.commons.codec.binary.Hex;
-import org.hibernate.Session;
-import org.hibernate.annotations.GenerationTime;
-import org.hibernate.annotations.GeneratorType;
-import org.hibernate.tuple.ValueGenerator;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -27,34 +20,25 @@ import java.util.List;
 @Entity
 public class Block {
 
-    public static class BlockHeightGenerator implements ValueGenerator<Long> {
+    @JsonIgnore
+    private byte[] hashBlock;
 
-        @Override
-        public Long generateValue(Session session, Object o) {
-            return SpringContext.getBean(BlockchainService.class).getNextBlockHeight();
-        }
+    @PrePersist
+    public void preSave() {
+        this.hashBlock = hashHeader();
     }
 
     @JsonIgnore
-    private String hashBlock;
-
     @Id
-    @Column(length = 64)
-    public String getHashBlock() {
-        return Hex.encodeHexString(hashHeader(), false);
-    }
-
-    // TODO: this actually doesn't increment, weird
-    @JsonIgnore
-    @GeneratorType(when = GenerationTime.INSERT, type = BlockHeightGenerator.class)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     // block height
     private long height;
 
     private Header header;
-
-    private List<Transaction> transactions;
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderColumn(name = "index_in_block")
+    private List<Transaction> transactions;
+
     public List<Transaction> getTransactions() {
         return transactions;
     }

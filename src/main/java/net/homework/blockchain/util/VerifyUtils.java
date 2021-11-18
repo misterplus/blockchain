@@ -33,7 +33,7 @@ public class VerifyUtils {
     }
 
     public static boolean isOutputPresentInTx(Transaction toCheck, byte[] refOut, int outIndex) {
-        return toCheck.hashTransaction() == refOut && toCheck.getOutputs().size() > outIndex;
+        return Arrays.equals(toCheck.hashTransaction(), refOut) && toCheck.getOutputs().size() > outIndex;
     }
 
     public static boolean verifyInput(Transaction.Input input) {
@@ -109,7 +109,7 @@ public class VerifyUtils {
             for (Transaction txInPool : txPool.values()) {
                 for (Transaction.Input inputInPool : txInPool.getInputs()) {
                     // if the referenced output is spent by any other transaction in the pool, reject this transaction.
-                    if (inputInPool.getPreviousTransactionHash() == refOut && inputInPool.getOutIndex() == outIndex) {
+                    if (Arrays.equals(inputInPool.getPreviousTransactionHash(), refOut) && inputInPool.getOutIndex() == outIndex) {
                         return false;
                     }
                 }
@@ -182,7 +182,7 @@ public class VerifyUtils {
     }
 
     public static boolean isTxSpentByInput(Transaction tx, Transaction.Input input) {
-        return input.getPreviousTransactionHash() == tx.hashTransaction() && tx.getOutputs().size() > input.getOutIndex();
+        return Arrays.equals(input.getPreviousTransactionHash(), tx.hashTransaction()) && tx.getOutputs().size() > input.getOutIndex();
     }
 
     public static boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, Transaction> txPool) {
@@ -197,7 +197,7 @@ public class VerifyUtils {
         // Reject if block is duplicated
         // Transaction list must be non-empty
         // Block hash must satisfy claimed nBits proof of work, matching the difficulty
-        if (blockchainService.getBlockOnChain(headerHash) != null || isListEmpty(txs) || !ByteUtils.isZero(Arrays.copyOf(headerHash, Config.DIFFICULTY))) {
+        if (blockchainService.getBlockOnChainByHash(headerHash) != null || isListEmpty(txs) || !ByteUtils.isZero(Arrays.copyOf(headerHash, Config.DIFFICULTY))) {
             return false;
         }
         Block.Header header = block.getHeader();
@@ -229,7 +229,7 @@ public class VerifyUtils {
             return false;
         }
         // Check if prev block is on-chain.
-        Block prevBlock = blockchainService.getBlockOnChain(header.getHashPrevBlock());
+        Block prevBlock = blockchainService.getBlockOnChainByHash(header.getHashPrevBlock());
         if (prevBlock == null) {
             // orphan block, add this to orphan blocks
             orphanBlocks.put(ByteBuffer.wrap(headerHash), block);
@@ -313,7 +313,7 @@ public class VerifyUtils {
 
                 // For each orphan block for which this block is its prev, run all these steps (including this one) recursively on that orphan
                 orphanBlocks.values().forEach(orphanBlock -> {
-                    if (headerHash == orphanBlock.getHeader().getHashPrevBlock()) {
+                    if (Arrays.equals(headerHash, orphanBlock.getHeader().getHashPrevBlock())) {
                         try {
                             verifyBlock(orphanBlock, InetAddress.getLocalHost(), orphanBlocks, txPool);
                         } catch (UnknownHostException e) {

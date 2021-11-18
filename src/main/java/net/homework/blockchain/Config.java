@@ -1,7 +1,7 @@
 package net.homework.blockchain;
 
 public interface Config {
-    // difficulty is BYTES (8 times bits)
+    // difficulty in BYTES (8 * DIFFICULTY bits)
     int DIFFICULTY = 3;
     int PORT_TX_BROADCAST_IN = 10240;
     int PORT_TX_BROADCAST_OUT = 10241;

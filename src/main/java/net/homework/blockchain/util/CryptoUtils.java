@@ -92,4 +92,8 @@ public class CryptoUtils {
         byte[] decoded = Base58.decode(address);
         return Arrays.copyOfRange(decoded, 1, decoded.length - 4);
     }
+
+    public static byte[] hashPublicKeyBytes(byte[] publicKeyBytes) {
+        return ripmd160(sha256(publicKeyBytes));
+    }
 }
