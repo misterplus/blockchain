@@ -39,10 +39,6 @@ public class Block {
     @OrderColumn(name = "index_in_block")
     private List<Transaction> transactions;
 
-    public List<Transaction> getTransactions() {
-        return transactions;
-    }
-
     public Block(byte[] hashPrevBlock, List<Transaction> transactions) {
         ArrayList<byte[]> tree = new ArrayList<>();
         for (Transaction tx : transactions) {

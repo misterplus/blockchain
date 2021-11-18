@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.PostConstruct;
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class BlockchainService {
@@ -107,7 +108,19 @@ public class BlockchainService {
         return utxos;
     }
 
-    public List<Transaction> getTransactionsByAddress(byte[] publicKey) {
+    public long getBalance(byte[] publicKey) {
+        Map<ByteBuffer, List<Integer>> utxos = getUTXOsNEW(publicKey);
+        AtomicLong bal = new AtomicLong();
+        utxos.forEach((txHash, indexes) -> {
+            List<Transaction.Output> outputs = getTransactionOnChain(txHash.array()).getOutputs();
+            indexes.forEach(index -> {
+                bal.addAndGet(outputs.get(index).getValue());
+            });
+        });
+        return bal.get();
+    }
+
+    public List<Transaction> getTransactionsByPublicKey(byte[] publicKey) {
         Set<Transaction> received = transactionRepository.findUniqueTransactionsByOutputs_ScriptPubKeyHash(CryptoUtils.hashPublicKeyBytes(publicKey));
         Set<Transaction> spent = transactionRepository.findUniqueTransactionsByInputs_ScriptPubKey(publicKey);
         List<Transaction> txs = new ArrayList<>();

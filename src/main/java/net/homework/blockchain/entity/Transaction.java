@@ -13,36 +13,25 @@ import java.util.List;
 @Data
 @Entity
 public class Transaction {
-
-    private List<Input> inputs;
-    private List<Output> outputs;
-
     // we use eager here cause everytime we fetch a transaction we would always need these lists
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderColumn(name = "input_index_in_tx")
-    public List<Input> getInputs() {
-        return inputs;
-    }
+    private List<Input> inputs;
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderColumn(name = "output_index_in_tx")
-    public List<Output> getOutputs() {
-        return outputs;
-    }
+    private List<Output> outputs;
 
     @JsonIgnore
     private byte[] hashTx;
 
     @JsonIgnore
-    private long dummyId;
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    public long getDummyId() {
-        return dummyId;
-    }
+    private long dummyId;
 
-    public byte[] getHashTx() {
-        return hashTransaction();
+    @PrePersist
+    public void preSave() {
+        this.hashTx = hashTransaction();
     }
 
     /**
@@ -71,7 +60,9 @@ public class Transaction {
         private byte[] scriptPubKey;
 
         public void incrementExtraNonce() {
-            outIndex++;
+            if (ByteUtils.isZero(previousTransactionHash)) {
+                outIndex++;
+            }
         }
 
         @Id
