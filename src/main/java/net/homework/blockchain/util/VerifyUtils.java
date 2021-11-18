@@ -93,7 +93,7 @@ public class VerifyUtils {
         byte[] txHash = tx.hashTransaction();
         // if it's a orphan who found parents, remove it from orphan pool
         orphanTxs.remove(ByteBuffer.wrap(txHash));
-        if (txPool.containsKey(ByteBuffer.wrap(txHash)) || blockchainService.getTransaction(txHash) != null) {
+        if (txPool.containsKey(ByteBuffer.wrap(txHash)) || blockchainService.getTransactionOnChain(txHash) != null) {
             return false;
         }
         byte[] refOut;
@@ -121,7 +121,7 @@ public class VerifyUtils {
             }
             // if it's still orphan, try to find the referenced output on-chain, if found, it's not orphan
             if (refOutTx == null) {
-                Transaction findOnChain = blockchainService.getTransaction(refOut);
+                Transaction findOnChain = blockchainService.getTransactionOnChain(refOut);
                 refOutTx = findOnChain != null && isOutputPresentInTx(findOnChain, refOut, outIndex) ? findOnChain : null;
             }
             // add to the orphan txs if is orphan
@@ -197,7 +197,7 @@ public class VerifyUtils {
         // Reject if block is duplicated
         // Transaction list must be non-empty
         // Block hash must satisfy claimed nBits proof of work, matching the difficulty
-        if (blockchainService.getBlock(headerHash) != null || isListEmpty(txs) || !ByteUtils.isZero(Arrays.copyOf(headerHash, Config.DIFFICULTY))) {
+        if (blockchainService.getBlockOnChain(headerHash) != null || isListEmpty(txs) || !ByteUtils.isZero(Arrays.copyOf(headerHash, Config.DIFFICULTY))) {
             return false;
         }
         Block.Header header = block.getHeader();
@@ -229,7 +229,7 @@ public class VerifyUtils {
             return false;
         }
         // Check if prev block is on-chain.
-        Block prevBlock = blockchainService.getBlock(header.getHashPrevBlock());
+        Block prevBlock = blockchainService.getBlockOnChain(header.getHashPrevBlock());
         if (prevBlock == null) {
             // orphan block, add this to orphan blocks
             orphanBlocks.put(ByteBuffer.wrap(headerHash), block);
@@ -254,7 +254,7 @@ public class VerifyUtils {
                     long inputSum = 0L;
                     for (Transaction.Input input : tx.getInputs()) {
                         refOut = input.getPreviousTransactionHash();
-                        refOutTx = blockchainService.getTransaction(refOut);
+                        refOutTx = blockchainService.getTransactionOnChain(refOut);
                         outIndex = input.getOutIndex();
                         // Reject if the output transaction is missing for any input.
                         if ((refOutTx == null) ||
@@ -307,7 +307,7 @@ public class VerifyUtils {
                 // TODO: send updated tx pool to miners (which txs are no longer in pool)
 
                 // Add to chain
-                blockchainService.addBlock(block);
+                blockchainService.addBlockToChain(block);
                 // Broadcast block to our peers
                 NetworkUtils.broadcast(Config.PORT_BLOCK_BROADCAST_OUT, block.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
 

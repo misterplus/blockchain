@@ -5,11 +5,15 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import net.homework.blockchain.Config;
+import net.homework.blockchain.SpringContext;
+import net.homework.blockchain.service.BlockchainService;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.binary.Hex;
-import org.hibernate.annotations.Immutable;
-import org.hibernate.annotations.NaturalId;
+import org.hibernate.Session;
+import org.hibernate.annotations.GenerationTime;
+import org.hibernate.annotations.GeneratorType;
+import org.hibernate.tuple.ValueGenerator;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -23,6 +27,14 @@ import java.util.List;
 @Entity
 public class Block {
 
+    public static class BlockHeightGenerator implements ValueGenerator<Long> {
+
+        @Override
+        public Long generateValue(Session session, Object o) {
+            return SpringContext.getBean(BlockchainService.class).getNextBlockHeight();
+        }
+    }
+
     @JsonIgnore
     private String hashBlock;
 
@@ -32,8 +44,9 @@ public class Block {
         return Hex.encodeHexString(hashHeader(), false);
     }
 
+    // TODO: this actually doesn't increment, weird
     @JsonIgnore
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratorType(when = GenerationTime.INSERT, type = BlockHeightGenerator.class)
     // block height
     private long height;
 

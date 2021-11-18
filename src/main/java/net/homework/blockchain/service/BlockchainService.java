@@ -1,6 +1,5 @@
 package net.homework.blockchain.service;
 
-import lombok.SneakyThrows;
 import net.homework.blockchain.Config;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
@@ -28,15 +27,15 @@ public class BlockchainService {
     @Autowired
     private OutputRepository outputRepository;
 
-    public Block getBlock(byte[] headerHash) {
+    public Block getBlockOnChain(byte[] headerHash) {
         return blockRepository.findById(Hex.encodeHexString(headerHash, false)).orElse(null);
     }
 
     public boolean isSonPresentForParentBlock(byte[] hashPrevBlock) {
-        return blockRepository.findBlockByHeader_HashPrevBlock(hashPrevBlock).isPresent();
+        return blockRepository.existsBlockByHeader_HashPrevBlock(hashPrevBlock);
     }
 
-    public void addBlock(Block block) {
+    public void addBlockToChain(Block block) {
        blockRepository.save(block);
     }
 
@@ -44,7 +43,7 @@ public class BlockchainService {
         return inputRepository.findInputByPreviousTransactionHashAndOutIndex(refOut, outIndex).isPresent();
     }
 
-    public Transaction getTransaction(byte[] txHash) {
+    public Transaction getTransactionOnChain(byte[] txHash) {
         return transactionRepository.findTransactionByHashTx(txHash).orElse(null);
     }
 
@@ -90,10 +89,13 @@ public class BlockchainService {
             Block genesis = new Block(new byte[]{0}, Collections.singletonList(tx));
             genesis.getHeader().setNonce(4913801);
             genesis.getHeader().setTime(1637148832393L);
-            addBlock(genesis);
+            addBlockToChain(genesis);
         }
-
 //        Map<ByteBuffer, List<Integer>> test = getUTXOs(CryptoUtils.getPublicKeyHashFromAddress("16SChybffW7NEM7L9Nq78K2PQTV2NPCEFn"));
 //        System.out.println("Test");
+    }
+
+    public long getNextBlockHeight() {
+        return blockRepository.count();
     }
 }
