@@ -1,8 +1,11 @@
 package net.homework.blockchain.controller;
 
+import net.homework.blockchain.client.NodeImpl;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
+import net.homework.blockchain.entity.WrappedTransaction;
 import net.homework.blockchain.service.BlockchainService;
+import net.homework.blockchain.util.ByteUtils;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -94,5 +97,10 @@ public class BlockchainController {
             arg.put(key, Arrays.stream(map.get(key).split(",")).map(Integer::valueOf).collect(Collectors.toList()));
         }
         return blockchainService.getTotalInput(arg);
+    }
+
+    @RequestMapping("txPool")
+    public String getTransactionPool() {
+        return ByteUtils.toJson(NodeImpl.TX_POOL.values());
     }
 }

@@ -5,8 +5,10 @@ import lombok.SneakyThrows;
 import net.homework.blockchain.Config;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
+import net.homework.blockchain.entity.WrappedTransaction;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
+import net.homework.blockchain.util.MsgUtils;
 import net.homework.blockchain.util.NetworkUtils;
 import org.apache.commons.codec.binary.Hex;
 
@@ -19,14 +21,16 @@ import java.util.stream.Collectors;
 
 public class MinerImpl implements Miner {
 
-    // technically using a priority queue ordered by miner fees would be ideal
-    private final Queue<Transaction> localTxPool = new LinkedList<>();
+    private final PriorityQueue<WrappedTransaction> localTxPool = new PriorityQueue<>();
+    private final List<WrappedTransaction> revertList = new ArrayList<>();
     private InetAddress node;
     private String address;
     private byte[] publicKeyHash;
     private String urlLatestHash;
     private String urlTotalInput;
-    private boolean beaten = false;
+    private String urlInitLocalPool;
+    private MessageThread msgThread = new MessageThread();
+
 
     private MinerImpl() {
     }
@@ -76,20 +80,72 @@ public class MinerImpl implements Miner {
     }
 
     @Override
-    public boolean doPow(Block block) {
-        while (!block.isBlockValid()) {
-            if (beaten) {
-                // beaten by other miners, solution not found
-                return false;
+    public void updateReward(Block block, long extraFee) {
+        long feePrev = block.getTransactions().get(0).getOutputs().get(0).getValue();
+        block.getTransactions().get(0).getOutputs().get(0).setValue(feePrev + extraFee);
+    }
+
+    @Override
+    public void initLocalPool() {
+        List<WrappedTransaction> list = ByteUtils.fromBytes(HttpRequest.post(urlInitLocalPool)
+                .timeout(5000)
+                .execute().body().getBytes(), new ArrayList<>());
+        this.localTxPool.addAll(list);
+    }
+
+    @Override
+    public boolean fillBlock(Block newBlock) {
+        boolean blockFull = false;
+        long extraFee = 0L;
+        // TODO: if you want to update local pool, do it now
+        // keep adding txs until block is full or local pool is empty
+        while(newBlock.toBytes().length <= Config.MAX_BLOCK_SIZE && !localTxPool.isEmpty()) {
+            // get the most valuable one, but don't remove it from the queue
+            WrappedTransaction wrappedTx = localTxPool.element();
+            Transaction toAdd = wrappedTx.getTx();
+            // try adding it
+            newBlock.addTransaction(toAdd);
+            // if it doesn't fit, revert
+            if (newBlock.toBytes().length > Config.MAX_BLOCK_SIZE) {
+                newBlock.revert();
+                blockFull = true;
+                // in theory we can add smaller transactions, but halting is simpler (we are using queue)
+                break;
             }
-            block.increment();
+            // if it fits, remove the tx from local pool
+            else {
+                revertList.add(localTxPool.poll());
+                extraFee += wrappedTx.getFee();
+            }
         }
-        // solution found
-        return true;
+        // block finished, update miner fee
+        updateReward(newBlock, extraFee);
+        return blockFull;
+    }
+
+    @Override
+    public void digestMsgs() {
+        Queue<byte[]> msgs = this.msgThread.msgs;
+        while (!msgs.isEmpty()) {
+            byte[] msg = msgs.poll();
+            // add or remove shit
+        }
     }
 
     private static class MessageThread extends Thread {
+        // two types of msgs: add / remove
+        // add: new txs to add, just add it, block is fine
+        // remove: txs to remove from the current local pool, which means another block was submitted and accepted, stop hashing the current block and discard it
         private final Queue<byte[]> msgs = new LinkedList<>();
+        private boolean beaten = false;
+
+        public boolean isBeaten() {
+            return beaten;
+        }
+
+        public void resetBeaten() {
+            this.beaten = false;
+        }
 
         @Override
         public void run() {
@@ -101,7 +157,11 @@ public class MinerImpl implements Miner {
                     data = new byte[32768];
                     packet = new DatagramPacket(data, data.length);
                     socket.receive(packet);
+                    boolean isRemove = MsgUtils.isMsgRemove(data);
                     // add to queue
+                    if (isRemove) {
+                        beaten = true;
+                    }
                     msgs.add(data);
                 }
             } catch (IOException e) {
@@ -115,35 +175,31 @@ public class MinerImpl implements Miner {
         MinerImpl miner = new MinerImpl();
         miner.urlLatestHash = String.format("%s:%d/block/latestHash", args[0], Config.PORT_HTTP);
         miner.urlTotalInput = String.format("%s:%d/totalInput", args[0], Config.PORT_HTTP);
+        miner.urlInitLocalPool = String.format("%s:%d/txPool", args[0], Config.PORT_HTTP);
         miner.node = InetAddress.getByName(args[0]);
         miner.address = args[1];
         miner.publicKeyHash = CryptoUtils.getPublicKeyHashFromAddress(args[1]);
         miner.initLocalPool();
+        miner.msgThread.start();
         while(true) {
             String latestHash = miner.getLatestBlockHash();
             Block newBlock = new Block(Hex.decodeHex(latestHash), miner.createCoinbase());
-            // TODO: if you want to update local pool, do it now
-            // keep adding txs until block is full or local pool is empty
-            while(newBlock.toBytes().length <= Config.MAX_BLOCK_SIZE && !miner.localTxPool.isEmpty()) {
-                // get one to add, but don't remove it from the queue
-                Transaction toAdd = miner.localTxPool.element();
-                // try adding it
-                newBlock.addTransaction(toAdd);
-                // if it doesn't fit, revert
-                if (newBlock.toBytes().length > Config.MAX_BLOCK_SIZE) {
-                    newBlock.revert();
-                    // in theory we can add smaller transactions, but halting is simpler (we are using queue)
+            // try filling block, might be full, might not be (local pool not empty)
+            boolean blockFull = miner.fillBlock(newBlock);
+            // do pow stuff
+            boolean success = true;
+            while (!newBlock.isBlockValid()) {
+                if (miner.msgThread.isBeaten()) {
+                    // beaten by other miners, solution not found
+                    success = false;
                     break;
                 }
-                // if it fits, remove the tx from local pool
-                else {
-                    miner.localTxPool.poll();
+                // refilling the block every 1mil hashes
+                if (!blockFull && newBlock.getHeader().getNonce() % Config.REFILLING_INTERVAL == 0) {
+                    blockFull = miner.fillBlock(newBlock);
                 }
+                newBlock.increment();
             }
-            // block finished, update miner fee
-            miner.updateReward(newBlock);
-            // do pow stuff
-            boolean success = miner.doPow(newBlock);
             if (success) {
                 System.out.printf("[MSG]Block with hash %s is solved with nonce %d!", Hex.encodeHexString(newBlock.hashHeader()), newBlock.getHeader().getNonce());
                 // submit to node
@@ -155,16 +211,23 @@ public class MinerImpl implements Miner {
                 data = new byte[32768];
                 packet = new DatagramPacket(data, data.length);
                 socket.receive(packet);
-                Map<String, Boolean> map = ByteUtils.fromBytes(packet.getData(), new HashMap<>());
-                boolean accepted = map.get("BlockAccepted");
+                boolean accepted = MsgUtils.isBlockAccepted(data);
                 if (accepted) {
+                    // block solved by us and accepted by node
                     System.out.printf("[MSG]Block with hash %s is accepted!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
                 } else {
+                    // block solved by us but rejected by node, revert local pool, as if we did not solve this block
+                    miner.localTxPool.addAll(miner.revertList);
                     System.out.printf("[MSG]Block with hash %s is rejected!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
                 }
             } else {
-                System.out.printf("[MSG]Block with hash %s is not solved, discarding!", Hex.encodeHexString(newBlock.hashHeader()));
+                // block solved by others, revert local pool, as if we did not solve this block
+                miner.localTxPool.addAll(miner.revertList);
+                miner.msgThread.resetBeaten();
+                System.out.printf("[MSG]Block with hash %s is already solved by others, discarding!", Hex.encodeHexString(newBlock.hashHeader()));
             }
+            // clear the revert list no matter what
+            miner.revertList.clear();
         }
     }
 }

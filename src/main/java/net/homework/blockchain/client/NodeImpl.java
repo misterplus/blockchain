@@ -3,7 +3,9 @@ package net.homework.blockchain.client;
 import net.homework.blockchain.Config;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
+import net.homework.blockchain.entity.WrappedTransaction;
 import net.homework.blockchain.util.ByteUtils;
+import net.homework.blockchain.util.MsgUtils;
 import net.homework.blockchain.util.NetworkUtils;
 import net.homework.blockchain.util.VerifyUtils;
 
@@ -17,7 +19,7 @@ import java.util.Map;
 public class NodeImpl implements Node {
 
     // valid txs, to be processed by a miner
-    public static Map<ByteBuffer, Transaction> TX_POOL = new HashMap<>();
+    public static Map<ByteBuffer, WrappedTransaction> TX_POOL = new HashMap<>();
     // because udp packets won't arrive in order, there'll be orphan transactions, waiting to be claimed by other txs
     public static Map<ByteBuffer, Transaction> ORPHAN_TXS = new HashMap<>();
     // orphan blocks
@@ -73,9 +75,8 @@ public class NodeImpl implements Node {
                     new Thread(() -> {
                         Block block = ByteUtils.fromBytes(finalData, new Block());
                         boolean accepted = VerifyUtils.verifyBlock(block, finalPacket.getAddress(), ORPHAN_BLOCKS, TX_POOL);
-                        Map<String, Boolean> map = new HashMap<>();
-                        map.put("BlockAccepted", accepted);
-                        NetworkUtils.sendPacket(finalPacket.getAddress(), Config.PORT_MSG_OUT, ByteUtils.toBytes(map), Config.PORT_MSG_IN);
+                        byte[] resp = new byte[]{accepted ? MsgUtils.BLOCK_ACCEPTED : MsgUtils.BLOCK_REJECTED};
+                        NetworkUtils.sendPacket(finalPacket.getAddress(), Config.PORT_MSG_OUT, resp, Config.PORT_MSG_IN);
                     }).start();
                 }
                 // TODO: gracefully exit loop, send loopback msg?

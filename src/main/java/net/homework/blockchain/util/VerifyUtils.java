@@ -4,6 +4,7 @@ import net.homework.blockchain.Config;
 import net.homework.blockchain.SpringContext;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
+import net.homework.blockchain.entity.WrappedTransaction;
 import net.homework.blockchain.service.BlockchainService;
 
 import java.net.InetAddress;
@@ -73,7 +74,7 @@ public class VerifyUtils {
         return outputSum;
     }
 
-    public static boolean verifyTx(Transaction tx, Map<ByteBuffer, Transaction> txPool, Map<ByteBuffer, Transaction> orphanTxs) {
+    public static boolean verifyTx(Transaction tx, Map<ByteBuffer, WrappedTransaction> txPool, Map<ByteBuffer, Transaction> orphanTxs) {
         // Check syntactic correctness
         if (tx == null) {
             return false;
@@ -106,7 +107,8 @@ public class VerifyUtils {
             refOut = input.getPreviousTransactionHash();
             outIndex = input.getOutIndex();
             refOutTx = null;
-            for (Transaction txInPool : txPool.values()) {
+            for (WrappedTransaction wrappedTxInPool : txPool.values()) {
+                Transaction txInPool = wrappedTxInPool.getTx();
                 for (Transaction.Input inputInPool : txInPool.getInputs()) {
                     // if the referenced output is spent by any other transaction in the pool, reject this transaction.
                     if (Arrays.equals(inputInPool.getPreviousTransactionHash(), refOut) && inputInPool.getOutIndex() == outIndex) {
@@ -162,7 +164,7 @@ public class VerifyUtils {
         }
 
         // Add to transaction pool
-        txPool.put(ByteBuffer.wrap(txHash), tx);
+        txPool.put(ByteBuffer.wrap(txHash), new WrappedTransaction(tx, inputSum - outputSum));
 
         // Broadcast transaction to nodes
         NetworkUtils.broadcastAsync(Config.PORT_TX_BROADCAST_OUT, tx.toBytes(), Config.PORT_TX_BROADCAST_IN);
@@ -185,7 +187,7 @@ public class VerifyUtils {
         return Arrays.equals(input.getPreviousTransactionHash(), tx.hashTransaction()) && tx.getOutputs().size() > input.getOutIndex();
     }
 
-    public static boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, Transaction> txPool) {
+    public static boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, WrappedTransaction> txPool) {
         // Check syntactic correctness
         if (block == null) {
             return false;

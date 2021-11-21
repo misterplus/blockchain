@@ -3,6 +3,8 @@ package net.homework.blockchain;
 public interface Config {
     // difficulty in BYTES (8 * DIFFICULTY bits)
     int DIFFICULTY = 3;
+    // refilling block after every x hashes
+    int REFILLING_INTERVAL = 1000000;
     int PORT_HTTP = 8080;
     int PORT_TX_BROADCAST_IN = 10240;
     int PORT_TX_BROADCAST_OUT = 10241;

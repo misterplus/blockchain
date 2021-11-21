@@ -2,8 +2,10 @@ package net.homework.blockchain.service;
 
 import lombok.SneakyThrows;
 import net.homework.blockchain.Config;
+import net.homework.blockchain.client.NodeImpl;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
+import net.homework.blockchain.entity.WrappedTransaction;
 import net.homework.blockchain.repo.BlockRepository;
 import net.homework.blockchain.repo.InputRepository;
 import net.homework.blockchain.repo.OutputRepository;
@@ -146,6 +148,13 @@ public class BlockchainService {
             genesis.getHeader().setTime(1637148832393L);
             addBlockToChain(genesis);
         }
+        testMethod();
+    }
+
+    @Deprecated
+    public void testMethod() {
+        Transaction tx = getBlockOnChainByHeight(1L).getTransactions().get(0);
+        NodeImpl.TX_POOL.put(ByteBuffer.wrap(tx.hashTransaction()), new WrappedTransaction(tx, 5L));
     }
 
     public long getCurrentBlockHeight() {
