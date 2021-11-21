@@ -1,12 +1,10 @@
 package net.homework.blockchain.util;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
+import java.net.*;
 
 public class NetworkUtils {
-    public static void broadcast(int portOut, byte[] data, int portIn) {
+    public static void broadcastAsync(int portOut, byte[] data, int portIn) {
         new Thread(() -> {
             try {
                 DatagramSocket socket = new DatagramSocket(portOut, InetAddress.getLocalHost());
@@ -18,5 +16,16 @@ public class NetworkUtils {
                 e.printStackTrace();
             }
         }).start();
+    }
+
+    public static void sendPacket(InetAddress address, int portOut, byte[] data, int portIn) {
+        try {
+            DatagramSocket socket = new DatagramSocket(portOut, InetAddress.getLocalHost());
+            DatagramPacket packet = new DatagramPacket(data, data.length, address, portIn);
+            socket.send(packet);
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

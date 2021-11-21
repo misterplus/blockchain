@@ -26,10 +26,15 @@ public class MerkleTree {
         this.merkleRoot = doRehash((ArrayList<byte[]>) tree.clone()).get(0);
     }
 
-    public void addHash(Transaction transaction) {
+    public void addTransaction(Transaction transaction) {
         if (this.tree.add(transaction.hashTransaction())) {
             rehash();
         }
+    }
+
+    public void revert() {
+        this.tree.remove(this.tree.size() - 1);
+        rehash();
     }
 
     private ArrayList<byte[]> doRehash(ArrayList<byte[]> tree) {

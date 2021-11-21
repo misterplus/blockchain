@@ -4,6 +4,7 @@ import net.homework.blockchain.Config;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
 import net.homework.blockchain.util.ByteUtils;
+import net.homework.blockchain.util.NetworkUtils;
 import net.homework.blockchain.util.VerifyUtils;
 
 import java.io.IOException;
@@ -67,10 +68,15 @@ public class NodeImpl implements Node {
                     packet = new DatagramPacket(data, data.length);
                     // blocking
                     socket.receive(packet);
-                    Block block = ByteUtils.fromBytes(data, new Block());
-                    boolean accepted = VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL);
-
-                    // TODO: send accepted msg back
+                    byte[] finalData = data;
+                    DatagramPacket finalPacket = packet;
+                    new Thread(() -> {
+                        Block block = ByteUtils.fromBytes(finalData, new Block());
+                        boolean accepted = VerifyUtils.verifyBlock(block, finalPacket.getAddress(), ORPHAN_BLOCKS, TX_POOL);
+                        Map<String, Boolean> map = new HashMap<>();
+                        map.put("BlockAccepted", accepted);
+                        NetworkUtils.sendPacket(finalPacket.getAddress(), Config.PORT_MSG_OUT, ByteUtils.toBytes(map), Config.PORT_MSG_IN);
+                    }).start();
                 }
                 // TODO: gracefully exit loop, send loopback msg?
             } catch (IOException e) {

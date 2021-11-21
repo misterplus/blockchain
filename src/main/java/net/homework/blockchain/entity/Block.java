@@ -10,9 +10,8 @@ import net.homework.blockchain.util.CryptoUtils;
 
 import javax.persistence.*;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.nio.ByteBuffer;
+import java.util.*;
 
 @Data
 @NoArgsConstructor
@@ -51,7 +50,12 @@ public class Block {
 
     public void addTransaction(Transaction tx) {
         this.transactions.add(tx);
-        this.header.addHash(tx);
+        this.header.addTransaction(tx);
+    }
+
+    public void revert() {
+        this.transactions.remove(this.transactions.size() - 1);
+        this.header.revert();
     }
 
     /**
@@ -120,13 +124,18 @@ public class Block {
             this.time = System.currentTimeMillis();
         }
 
-        public void updateMerkleRoot(byte[] newRoot) {
-            this.hashMerkleRoot = newRoot;
+        private void updateMerkleRoot() {
+            this.hashMerkleRoot = this.merkleTree.hashMerkleTree();
         }
 
-        public void addHash(Transaction tx) {
-            this.merkleTree.addHash(tx);
-            this.updateMerkleRoot(this.merkleTree.hashMerkleTree());
+        public void addTransaction(Transaction tx) {
+            this.merkleTree.addTransaction(tx);
+            this.updateMerkleRoot();
+        }
+
+        public void revert() {
+            this.merkleTree.revert();
+            this.updateMerkleRoot();
         }
 
         private byte[] hashHeader() {

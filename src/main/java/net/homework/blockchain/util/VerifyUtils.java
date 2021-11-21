@@ -165,7 +165,7 @@ public class VerifyUtils {
         txPool.put(ByteBuffer.wrap(txHash), tx);
 
         // Broadcast transaction to nodes
-        NetworkUtils.broadcast(Config.PORT_TX_BROADCAST_OUT, tx.toBytes(), Config.PORT_TX_BROADCAST_IN);
+        NetworkUtils.broadcastAsync(Config.PORT_TX_BROADCAST_OUT, tx.toBytes(), Config.PORT_TX_BROADCAST_IN);
 
         // TODO: send new tx in pool (txHash/tx) to miners
 
@@ -309,7 +309,7 @@ public class VerifyUtils {
                 // Add to chain
                 blockchainService.addBlockToChain(block);
                 // Broadcast block to our peers
-                NetworkUtils.broadcast(Config.PORT_BLOCK_BROADCAST_OUT, block.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
+                NetworkUtils.broadcastAsync(Config.PORT_BLOCK_BROADCAST_OUT, block.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
 
                 // For each orphan block for which this block is its prev, run all these steps (including this one) recursively on that orphan
                 orphanBlocks.values().forEach(orphanBlock -> {
