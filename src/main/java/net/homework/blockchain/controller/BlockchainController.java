@@ -88,15 +88,6 @@ public class BlockchainController {
         }
     }
 
-    @RequestMapping("totalInput")
-    public long getTotalInput(@RequestBody Map<String, String> map) {
-        Map<String, List<Integer>> arg = new HashMap<>();
-        for (String key : map.keySet()) {
-            arg.put(key, Arrays.stream(map.get(key).split(",")).map(Integer::valueOf).collect(Collectors.toList()));
-        }
-        return blockchainService.getTotalInput(arg);
-    }
-
     @RequestMapping("txPool")
     public String getTransactionPool() {
         return ByteUtils.toJson(NodeImpl.TX_POOL.values());
