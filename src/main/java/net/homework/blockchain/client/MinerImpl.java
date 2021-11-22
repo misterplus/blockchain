@@ -40,19 +40,21 @@ public class MinerImpl implements Miner {
         miner.init(args);
         LOGGER.info("Entering main work loop...");
         while (true) {
+            // clear the revert list no matter what
+            miner.revertList.clear();
+            // reset beaten status
+            miner.msgThread.resetBeaten();
             String latestHash = miner.getLatestBlockHash();
             LOGGER.info(String.format("Latest block hash is %s.", latestHash));
             LOGGER.info("Creating new block...");
-            miner.msgThread.resetBeaten();
             Block newBlock = new Block(Hex.decodeHex(latestHash), miner.createCoinbase(Hex.decodeHex(latestHash)));
             // try filling block, might be full, might not be (local pool not empty)
             boolean blockFull = miner.fillBlock(newBlock);
             // do pow stuff
-            boolean success = true;
             while (!newBlock.isBlockValid()) {
                 if (miner.msgThread.isBeaten()) {
-                    // beaten by other miners, solution not found
-                    success = false;
+                    // block solved by others, revert local pool
+                    miner.localTxPool.addAll(miner.revertList);
                     break;
                 }
                 // refilling the block every 1mil hashes
@@ -61,9 +63,12 @@ public class MinerImpl implements Miner {
                 }
                 newBlock.increment();
             }
-            if (success) {
+            // block solved by others, discarding as if we did not solve this block
+            if (miner.msgThread.isBeaten()) {
+                LOGGER.info(String.format("Block with hash %s is already solved by others, discarding...", Hex.encodeHexString(newBlock.hashHeader(), false)));
+            } else {
                 LOGGER.info(String.format("Block with hash %s is solved with nonce %d.", Hex.encodeHexString(newBlock.hashHeader(), false), newBlock.getHeader().getNonce()));
-                // submit to node
+                // block solved by us, submit to node
                 NetworkUtils.sendPacket(miner.socketOut, newBlock.toMsg(), miner.node);
                 // wait for reply
                 synchronized (miner.msgThread.blockMsgs) {
@@ -78,13 +83,7 @@ public class MinerImpl implements Miner {
                     miner.localTxPool.addAll(miner.revertList);
                     LOGGER.info(String.format("Block with hash %s is rejected.", Hex.encodeHexString(newBlock.hashHeader(), false)));
                 }
-            } else {
-                // block solved by others, revert local pool, as if we did not solve this block
-                miner.localTxPool.addAll(miner.revertList);
-                LOGGER.info(String.format("Block with hash %s is already solved by others, discarding...", Hex.encodeHexString(newBlock.hashHeader(), false)));
             }
-            // clear the revert list no matter what
-            miner.revertList.clear();
         }
     }
 
