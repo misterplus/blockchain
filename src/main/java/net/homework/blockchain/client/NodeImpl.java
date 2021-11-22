@@ -22,13 +22,13 @@ public class NodeImpl implements Node {
     private static final BlockchainService blockchainService = SpringContext.getBean(BlockchainService.class);
 
     // valid txs, to be processed by a miner
-    public static Map<ByteBuffer, WrappedTransaction> TX_POOL = new HashMap<>();
+    public static final Map<ByteBuffer, WrappedTransaction> TX_POOL = new HashMap<>();
     // because udp packets won't arrive in order, there'll be orphan transactions, waiting to be claimed by other txs
-    public static Map<ByteBuffer, Transaction> ORPHAN_TXS = new HashMap<>();
+    public static final Map<ByteBuffer, Transaction> ORPHAN_TXS = new HashMap<>();
     // orphan blocks
-    public static Map<ByteBuffer, Block> ORPHAN_BLOCKS = new HashMap<>();
+    public static final Map<ByteBuffer, Block> ORPHAN_BLOCKS = new HashMap<>();
 
-    private final List<ListeningThread> threads = new ArrayList<>();
+    private ListeningThread listeningThread;
     private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_OUT);
 
     public NodeImpl() throws SocketException {
@@ -37,7 +37,7 @@ public class NodeImpl implements Node {
     @Override
     public void listenForMsg() {
         try {
-            ListeningThread thread = new ListeningThread() {
+            listeningThread = new ListeningThread() {
                 @Override
                 public void digest(byte[] data, DatagramPacket packet) {
                     switch (data[0]) {
@@ -75,8 +75,7 @@ public class NodeImpl implements Node {
                     }
                 }
             };
-            threads.add(thread);
-            thread.start();
+            listeningThread.start();
         } catch (SocketException e) {
             e.printStackTrace();
         }
@@ -84,14 +83,12 @@ public class NodeImpl implements Node {
 
     public void gracefulShutdown() {
         LOGGER.info("Shutdown initiated...");
-        for (ListeningThread t : threads) {
-            try {
-                // if a thread is blocked by receive, interrupt it (no processing in place, we're fine)
-                t.close();
-                t.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        try {
+            // if a thread is blocked by receive, interrupt it (no processing in place, we're fine)
+            listeningThread.close();
+            listeningThread.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
         LOGGER.info("Shutdown completed.");
     }

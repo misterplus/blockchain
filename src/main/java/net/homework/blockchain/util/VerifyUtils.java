@@ -79,7 +79,7 @@ public class VerifyUtils {
         return outputSum;
     }
 
-    public static boolean verifyTx(Transaction tx, Map<ByteBuffer, WrappedTransaction> txPool, Map<ByteBuffer, Transaction> orphanTxs, DatagramSocket socketOut) {
+    public static synchronized boolean verifyTx(Transaction tx, Map<ByteBuffer, WrappedTransaction> txPool, Map<ByteBuffer, Transaction> orphanTxs, DatagramSocket socketOut) {
         // Check syntactic correctness
         if (tx == null) {
             return false;
@@ -194,7 +194,7 @@ public class VerifyUtils {
         return Arrays.equals(input.getPreviousTransactionHash(), tx.hashTransaction()) && tx.getOutputs().size() > input.getOutIndex();
     }
 
-    public static boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, WrappedTransaction> txPool, DatagramSocket socketOut) {
+    public static synchronized boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, WrappedTransaction> txPool, DatagramSocket socketOut) {
         // Check syntactic correctness
         if (block == null) {
             return false;
