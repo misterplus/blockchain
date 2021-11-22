@@ -10,7 +10,6 @@ public class MsgUtils {
     public final static byte BLOCK_REJECTED = 2; // node to miner
     public final static byte TX_ACCEPTED = 3; // node to user
     public final static byte TX_REJECTED = 4; // node to user
-    public final static byte HALT = 5; // node to self
 
     // multi-part msgs
     public final static byte TX_POOL_ADD = -1; // + a list of wrapped txs | node to miner
@@ -43,10 +42,6 @@ public class MsgUtils {
 
     public static boolean isBlockRequestMsg(byte[] data) {
         return data[0] == BLOCK_REQUESTED;
-    }
-
-    public static boolean isHaltingMsg(byte[] data) {
-        return data[0] == HALT;
     }
 
     public static byte[] toBlockRequestMsg(byte[] part) {
