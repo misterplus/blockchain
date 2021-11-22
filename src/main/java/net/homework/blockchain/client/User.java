@@ -6,6 +6,7 @@ import org.apache.commons.codec.DecoderException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.UnknownHostException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -23,8 +24,8 @@ public interface User {
      * @param recipientsWithAmount publicKeyHash, value
      * @return
      */
-    Transaction assembleTx(Map<byte[], byte[]> recipientsWithAmount);
-    void broadcastTx(Transaction tx);
+    Transaction assembleTx(Map<byte[], byte[]> recipientsWithAmount) throws DecoderException, IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException;
+    void broadcastTx(Transaction tx) throws IOException;
     /**
      * Get unspent transaction outputs.
      * @return transactionHash, outIndex
