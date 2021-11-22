@@ -30,10 +30,72 @@ public class MinerImpl implements Miner {
     private String urlLatestHash;
     private String urlTotalInput;
     private String urlInitLocalPool;
-    private MessageThread msgThread = new MessageThread();
+    private final MessageThread msgThread = new MessageThread();
 
 
     private MinerImpl() {
+    }
+
+    @SneakyThrows
+    public static void main(String[] args) {
+        MinerImpl miner = new MinerImpl();
+        miner.urlLatestHash = String.format("%s:%d/block/latestHash", args[0], Config.PORT_HTTP);
+        miner.urlTotalInput = String.format("%s:%d/totalInput", args[0], Config.PORT_HTTP);
+        miner.urlInitLocalPool = String.format("%s:%d/txPool", args[0], Config.PORT_HTTP);
+        miner.node = InetAddress.getByName(args[0]);
+        miner.address = args[1];
+        miner.publicKeyHash = CryptoUtils.getPublicKeyHashFromAddress(args[1]);
+        miner.initLocalPool();
+        miner.msgThread.start();
+        while (true) {
+            String latestHash = miner.getLatestBlockHash();
+            Block newBlock = new Block(Hex.decodeHex(latestHash), miner.createCoinbase());
+            // try filling block, might be full, might not be (local pool not empty)
+            boolean blockFull = miner.fillBlock(newBlock);
+            // do pow stuff
+            boolean success = true;
+            while (!newBlock.isBlockValid()) {
+                if (miner.msgThread.isBeaten()) {
+                    // beaten by other miners, solution not found
+                    success = false;
+                    break;
+                }
+                // refilling the block every 1mil hashes
+                if (!blockFull && newBlock.getHeader().getNonce() % Config.REFILLING_INTERVAL == 0) {
+                    blockFull = miner.fillBlock(newBlock);
+                }
+                newBlock.increment();
+            }
+            if (success) {
+                System.out.printf("[MSG]Block with hash %s is solved with nonce %d!", Hex.encodeHexString(newBlock.hashHeader()), newBlock.getHeader().getNonce());
+                // submit to node
+                NetworkUtils.sendPacket(miner.node, Config.PORT_BLOCK_BROADCAST_OUT, newBlock.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
+                // wait for reply
+                DatagramSocket socket = new DatagramSocket(Config.PORT_MSG_IN);
+                byte[] data = new byte[]{0};
+                DatagramPacket packet;
+                while (!MsgUtils.isBlockMsg(data)) {
+                    data = new byte[32768];
+                    packet = new DatagramPacket(data, data.length);
+                    socket.receive(packet);
+                    if (MsgUtils.isBlockAccepted(data)) {
+                        // block solved by us and accepted by node
+                        System.out.printf("[MSG]Block with hash %s is accepted!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
+                    } else if (MsgUtils.isBlockRejected(data)) {
+                        // block solved by us but rejected by node, revert local pool, as if we did not solve this block
+                        miner.localTxPool.addAll(miner.revertList);
+                        System.out.printf("[MSG]Block with hash %s is rejected!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
+                    }
+                }
+            } else {
+                // block solved by others, revert local pool, as if we did not solve this block
+                miner.localTxPool.addAll(miner.revertList);
+                miner.msgThread.resetBeaten();
+                System.out.printf("[MSG]Block with hash %s is already solved by others, discarding!", Hex.encodeHexString(newBlock.hashHeader()));
+            }
+            // clear the revert list no matter what
+            miner.revertList.clear();
+        }
     }
 
     @Override
@@ -100,7 +162,7 @@ public class MinerImpl implements Miner {
         long extraFee = 0L;
         digestMsgs();
         // keep adding txs until block is full or local pool is empty
-        while(newBlock.toBytes().length <= Config.MAX_BLOCK_SIZE && !localTxPool.isEmpty()) {
+        while (newBlock.toBytes().length <= Config.MAX_BLOCK_SIZE && !localTxPool.isEmpty()) {
             // get the most valuable one, but don't remove it from the queue
             WrappedTransaction wrappedTx = localTxPool.element();
             Transaction toAdd = wrappedTx.getTx();
@@ -182,68 +244,6 @@ public class MinerImpl implements Miner {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
-    }
-
-    @SneakyThrows
-    public static void main(String[] args) {
-        MinerImpl miner = new MinerImpl();
-        miner.urlLatestHash = String.format("%s:%d/block/latestHash", args[0], Config.PORT_HTTP);
-        miner.urlTotalInput = String.format("%s:%d/totalInput", args[0], Config.PORT_HTTP);
-        miner.urlInitLocalPool = String.format("%s:%d/txPool", args[0], Config.PORT_HTTP);
-        miner.node = InetAddress.getByName(args[0]);
-        miner.address = args[1];
-        miner.publicKeyHash = CryptoUtils.getPublicKeyHashFromAddress(args[1]);
-        miner.initLocalPool();
-        miner.msgThread.start();
-        while(true) {
-            String latestHash = miner.getLatestBlockHash();
-            Block newBlock = new Block(Hex.decodeHex(latestHash), miner.createCoinbase());
-            // try filling block, might be full, might not be (local pool not empty)
-            boolean blockFull = miner.fillBlock(newBlock);
-            // do pow stuff
-            boolean success = true;
-            while (!newBlock.isBlockValid()) {
-                if (miner.msgThread.isBeaten()) {
-                    // beaten by other miners, solution not found
-                    success = false;
-                    break;
-                }
-                // refilling the block every 1mil hashes
-                if (!blockFull && newBlock.getHeader().getNonce() % Config.REFILLING_INTERVAL == 0) {
-                    blockFull = miner.fillBlock(newBlock);
-                }
-                newBlock.increment();
-            }
-            if (success) {
-                System.out.printf("[MSG]Block with hash %s is solved with nonce %d!", Hex.encodeHexString(newBlock.hashHeader()), newBlock.getHeader().getNonce());
-                // submit to node
-                NetworkUtils.sendPacket(miner.node, Config.PORT_BLOCK_BROADCAST_OUT, newBlock.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
-                // wait for reply
-                DatagramSocket socket = new DatagramSocket(Config.PORT_MSG_IN);
-                byte[] data = new byte[]{0};
-                DatagramPacket packet;
-                while (!MsgUtils.isBlockMsg(data)) {
-                    data = new byte[32768];
-                    packet = new DatagramPacket(data, data.length);
-                    socket.receive(packet);
-                    if (MsgUtils.isBlockAccepted(data)) {
-                        // block solved by us and accepted by node
-                        System.out.printf("[MSG]Block with hash %s is accepted!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
-                    } else if (MsgUtils.isBlockRejected(data)) {
-                        // block solved by us but rejected by node, revert local pool, as if we did not solve this block
-                        miner.localTxPool.addAll(miner.revertList);
-                        System.out.printf("[MSG]Block with hash %s is rejected!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
-                    }
-                }
-            } else {
-                // block solved by others, revert local pool, as if we did not solve this block
-                miner.localTxPool.addAll(miner.revertList);
-                miner.msgThread.resetBeaten();
-                System.out.printf("[MSG]Block with hash %s is already solved by others, discarding!", Hex.encodeHexString(newBlock.hashHeader()));
-            }
-            // clear the revert list no matter what
-            miner.revertList.clear();
         }
     }
 }

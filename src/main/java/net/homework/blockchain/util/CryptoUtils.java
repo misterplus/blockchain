@@ -18,6 +18,9 @@ import java.util.Arrays;
 public class CryptoUtils {
     private static MessageDigest sha256;
     private static MessageDigest ripemd160;
+    private static KeyFactory keyFactory;
+    private static final ECParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec("secp256k1");
+    private static Signature signer;
 
     static {
         Security.addProvider(new BouncyCastleProvider());
@@ -25,6 +28,17 @@ public class CryptoUtils {
             sha256 = MessageDigest.getInstance("SHA-256");
             ripemd160 = MessageDigest.getInstance("RIPEMD160");
         } catch (NoSuchAlgorithmException ignored) {
+        }
+    }
+
+    static {
+        try {
+            Security.addProvider(new BouncyCastleProvider());
+            keyFactory = KeyFactory.getInstance("ECDSA", "BC");
+            Security.addProvider(new BouncyCastleProvider());
+            signer = Signature.getInstance("ECDSA", "BC");
+        } catch (NoSuchAlgorithmException | NoSuchProviderException e) {
+            e.printStackTrace();
         }
     }
 
@@ -38,21 +52,6 @@ public class CryptoUtils {
 
     public static byte[] ripmd160(byte[] input) {
         return ripemd160.digest(input);
-    }
-
-    private static KeyFactory keyFactory;
-    private static ECParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec("secp256k1");
-    private static Signature signer;
-
-    static {
-        try {
-            Security.addProvider(new BouncyCastleProvider());
-            keyFactory = KeyFactory.getInstance("ECDSA", "BC");
-            Security.addProvider(new BouncyCastleProvider());
-            signer = Signature.getInstance("ECDSA", "BC");
-        } catch (NoSuchAlgorithmException | NoSuchProviderException e) {
-            e.printStackTrace();
-        }
     }
 
     @SneakyThrows

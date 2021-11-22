@@ -3,13 +3,11 @@ package net.homework.blockchain.controller;
 import net.homework.blockchain.client.NodeImpl;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
-import net.homework.blockchain.entity.WrappedTransaction;
 import net.homework.blockchain.service.BlockchainService;
 import net.homework.blockchain.util.ByteUtils;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.json.GsonJsonParser;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.ByteBuffer;
@@ -81,8 +79,8 @@ public class BlockchainController {
             for (ByteBuffer key : utxos.keySet()) {
                 ret.put(Hex.encodeHexString(key.array(), false),
                         utxos.get(key).stream()
-                        .map(Object::toString)
-                        .collect(Collectors.joining(",")));
+                                .map(Object::toString)
+                                .collect(Collectors.joining(",")));
             }
             return ret;
         } catch (DecoderException e) {

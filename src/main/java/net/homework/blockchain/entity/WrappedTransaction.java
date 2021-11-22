@@ -6,8 +6,6 @@ import lombok.NoArgsConstructor;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.MsgUtils;
 
-import java.util.Arrays;
-
 @NoArgsConstructor
 @Data
 @AllArgsConstructor
@@ -15,6 +13,10 @@ public class WrappedTransaction implements Comparable<Long> {
 
     private Transaction tx;
     private long fee;
+
+    public static WrappedTransaction wrap(Transaction tx, long fee) {
+        return new WrappedTransaction(tx, fee);
+    }
 
     @Override
     public int compareTo(Long o) {
@@ -31,9 +33,5 @@ public class WrappedTransaction implements Comparable<Long> {
         msg[0] = MsgUtils.TX_POOL_ADD;
         System.arraycopy(part, 0, msg, 1, part.length);
         return msg;
-    }
-
-    public static WrappedTransaction wrap(Transaction tx, long fee) {
-        return new WrappedTransaction(tx, fee);
     }
 }

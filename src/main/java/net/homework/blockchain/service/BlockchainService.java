@@ -45,7 +45,7 @@ public class BlockchainService {
     }
 
     public void addBlockToChain(Block block) {
-       blockRepository.save(block);
+        blockRepository.save(block);
     }
 
     public boolean isOutputSpentOnChain(byte[] refOut, int outIndex) {

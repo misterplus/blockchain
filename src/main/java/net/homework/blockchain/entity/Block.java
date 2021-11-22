@@ -10,8 +10,9 @@ import net.homework.blockchain.util.CryptoUtils;
 
 import javax.persistence.*;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -21,23 +22,15 @@ public class Block {
 
     @JsonIgnore
     private byte[] hashBlock;
-
-    @PrePersist
-    public void preSave() {
-        this.hashBlock = hashHeader();
-    }
-
     @JsonIgnore
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     // block height
     private long height;
-
     private Header header;
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderColumn(name = "index_in_block")
     private List<Transaction> transactions;
-
     public Block(byte[] hashPrevBlock, List<Transaction> transactions) {
         ArrayList<byte[]> tree = new ArrayList<>();
         for (Transaction tx : transactions) {
@@ -46,6 +39,11 @@ public class Block {
         MerkleTree merkleTree = new MerkleTree(tree);
         this.header = new Header(hashPrevBlock, merkleTree);
         this.transactions = transactions;
+    }
+
+    @PrePersist
+    public void preSave() {
+        this.hashBlock = hashHeader();
     }
 
     public void addTransaction(Transaction tx) {
@@ -112,16 +110,16 @@ public class Block {
         @JsonIgnore
         private transient MerkleTree merkleTree;
 
-        @Transient // do not store in db
-        public MerkleTree getMerkleTree() {
-            return merkleTree;
-        }
-
         public Header(byte[] hashPrevBlock, MerkleTree merkleTree) {
             this.hashPrevBlock = hashPrevBlock;
             this.merkleTree = merkleTree;
             this.hashMerkleRoot = merkleTree.hashMerkleTree();
             this.time = System.currentTimeMillis();
+        }
+
+        @Transient // do not store in db
+        public MerkleTree getMerkleTree() {
+            return merkleTree;
         }
 
         private void updateMerkleRoot() {

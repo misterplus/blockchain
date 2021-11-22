@@ -1,7 +1,9 @@
 package net.homework.blockchain.util;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 
 public class NetworkUtils {
     public static void broadcastAsync(int portOut, byte[] data, int portIn) {

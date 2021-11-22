@@ -1,10 +1,7 @@
 package net.homework.blockchain;
 
-import net.homework.blockchain.client.User;
-import net.homework.blockchain.client.UserImpl;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
-import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.binary.Hex;
 

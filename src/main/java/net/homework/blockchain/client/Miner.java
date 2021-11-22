@@ -7,10 +7,16 @@ import java.util.List;
 
 public interface Miner {
     String getLatestBlockHash();
+
     List<Transaction> createCoinbase();
+
     void updateReward(Block block);
+
     void updateReward(Block block, long extraFee);
+
     void initLocalPool();
+
     boolean fillBlock(Block block);
+
     void digestMsgs();
 }

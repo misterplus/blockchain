@@ -29,17 +29,17 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long dummyId;
 
-    @PrePersist
-    public void preSave() {
-        this.hashTx = hashTransaction();
-    }
-
     /**
      * Construct a normal transaction.
      */
     public Transaction(List<Input> inputs, List<Output> outputs) {
         this.inputs = inputs;
         this.outputs = outputs;
+    }
+
+    @PrePersist
+    public void preSave() {
+        this.hashTx = hashTransaction();
     }
 
     public byte[] hashTransaction() {
@@ -58,13 +58,6 @@ public class Transaction {
         private int outIndex;
         private byte[] scriptSig;
         private byte[] scriptPubKey;
-
-        public void incrementExtraNonce() {
-            if (ByteUtils.isZero(previousTransactionHash)) {
-                outIndex++;
-            }
-        }
-
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         @JsonIgnore
@@ -91,6 +84,12 @@ public class Transaction {
             this.outIndex = -1;
             this.scriptSig = new byte[]{0};
             this.scriptPubKey = new byte[]{0};
+        }
+
+        public void incrementExtraNonce() {
+            if (ByteUtils.isZero(previousTransactionHash)) {
+                outIndex++;
+            }
         }
     }
 

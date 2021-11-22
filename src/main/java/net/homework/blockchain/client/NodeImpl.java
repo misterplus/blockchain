@@ -32,41 +32,31 @@ public class NodeImpl implements Node {
 
     private final boolean[] halt = new boolean[]{false};
 
-    private static abstract class ListeningThread extends Thread {
-        private final int portIn;
-        private final boolean[] halt;
-        public abstract void digest(byte[] data, DatagramPacket packet);
-
-        public ListeningThread(int portIn, boolean[] halt) {
-            this.portIn = portIn;
-            this.halt = halt;
-        }
-
-        @Override
-        public void run() {
-            try {
-                DatagramSocket socket = new DatagramSocket(portIn);
-                byte[] data;
-                DatagramPacket packet;
-                while (!socket.isClosed() && !halt[0]) {
-                    data = new byte[32768];
-                    packet = new DatagramPacket(data, data.length);
-                    // blocking
-                    socket.receive(packet);
-                    byte[] finalData = data;
-                    DatagramPacket finalPacket = packet;
-                    new Thread(() -> digest(finalData, finalPacket)).start();
-                }
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+    public static void main(String[] args) {
+        Node node = new NodeImpl();
+        node.init();
+        System.out.println("[MSG]Node is up and running...");
+        try {
+            DatagramSocket socket = new DatagramSocket(Config.PORT_LOCAL_HALT_IN);
+            byte[] data = new byte[]{0};
+            DatagramPacket packet;
+            while (!socket.isClosed() && !MsgUtils.isHaltingMsg(data)) {
+                data = new byte[32768];
+                packet = new DatagramPacket(data, data.length);
+                socket.receive(packet);
             }
+            socket.close();
+            System.out.println("[MSG]Halting msg received, exiting...");
+            node.halt();
+            // TODO: stop spring as well, maybe rework halting to a http request
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
     @Override
     public void listenForTransaction() {
-        new ListeningThread(Config.PORT_TX_BROADCAST_IN, halt){
+        new ListeningThread(Config.PORT_TX_BROADCAST_IN, halt) {
             @Override
             public void digest(byte[] data, DatagramPacket packet) {
                 Transaction tx = ByteUtils.fromBytes(data, new Transaction());
@@ -96,7 +86,7 @@ public class NodeImpl implements Node {
 
     @Override
     public void listenForMsg() {
-        new ListeningThread(Config.PORT_MSG_IN, halt){
+        new ListeningThread(Config.PORT_MSG_IN, halt) {
             @Override
             public void digest(byte[] data, DatagramPacket packet) {
                 // only listen for BLOCK_REQUEST
@@ -120,25 +110,36 @@ public class NodeImpl implements Node {
         this.listenForTransaction();
     }
 
-    public static void main(String[] args) {
-        Node node = new NodeImpl();
-        node.init();
-        System.out.println("[MSG]Node is up and running...");
-        try {
-            DatagramSocket socket = new DatagramSocket(Config.PORT_LOCAL_HALT_IN);
-            byte[] data = new byte[]{0};
-            DatagramPacket packet;
-            while (!socket.isClosed() && !MsgUtils.isHaltingMsg(data)) {
-                data = new byte[32768];
-                packet = new DatagramPacket(data, data.length);
-                socket.receive(packet);
+    private static abstract class ListeningThread extends Thread {
+        private final int portIn;
+        private final boolean[] halt;
+
+        public ListeningThread(int portIn, boolean[] halt) {
+            this.portIn = portIn;
+            this.halt = halt;
+        }
+
+        public abstract void digest(byte[] data, DatagramPacket packet);
+
+        @Override
+        public void run() {
+            try {
+                DatagramSocket socket = new DatagramSocket(portIn);
+                byte[] data;
+                DatagramPacket packet;
+                while (!socket.isClosed() && !halt[0]) {
+                    data = new byte[32768];
+                    packet = new DatagramPacket(data, data.length);
+                    // blocking
+                    socket.receive(packet);
+                    byte[] finalData = data;
+                    DatagramPacket finalPacket = packet;
+                    new Thread(() -> digest(finalData, finalPacket)).start();
+                }
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            socket.close();
-            System.out.println("[MSG]Halting msg received, exiting...");
-            node.halt();
-            // TODO: stop spring as well, maybe rework halting to a http request
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 }
