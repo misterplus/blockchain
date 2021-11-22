@@ -12,7 +12,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.stream.LongStream;
 
 public class VerifyUtils {
@@ -139,7 +138,7 @@ public class VerifyUtils {
                 return true;
             } else {
                 // if the referenced output is coinbase, it must be matured, or we reject it
-                if (isCoinbaseTx(refOutTx) && !blockchainService.isCoinbaseTxMature(refOutTx.hashTransaction())) {
+                if (isCoinbaseTx(refOutTx) && blockchainService.isCoinbaseTxImmature(refOutTx.hashTransaction())) {
                     return false;
                 }
                 // if the referenced output is spent on chain, reject it
@@ -277,7 +276,7 @@ public class VerifyUtils {
                                 (refOutTx.getOutputs().size() <= outIndex) ||
                                 // if the referenced output transaction is coinbase (i.e. only 1 input, with hash=0, n=-1),
                                 // it must have at least COINBASE_MATURITY (10) confirmations; else reject.
-                                (isCoinbaseTx(refOutTx) && !blockchainService.isCoinbaseTxMature(refOutTx.hashTransaction())) ||
+                                (isCoinbaseTx(refOutTx) && blockchainService.isCoinbaseTxImmature(refOutTx.hashTransaction())) ||
                                 // Verify crypto signatures for each input; reject if any are bad
                                 (!verifyInput(input)) ||
                                 // if the referenced output is spent on chain, reject it
@@ -319,13 +318,10 @@ public class VerifyUtils {
                 }
                 // For each transaction in the block, delete any matching transaction from the transaction pool
                 List<byte[]> removedTxHashes = new ArrayList<>();
-                txs.forEach(new Consumer<Transaction>() {
-                    @Override
-                    public void accept(Transaction tx) {
-                        WrappedTransaction removed = txPool.remove(ByteBuffer.wrap(tx.hashTransaction()));
-                        if (removed != null) {
-                            removedTxHashes.add(removed.getTx().hashTransaction());
-                        }
+                txs.forEach(tx -> {
+                    WrappedTransaction removed = txPool.remove(ByteBuffer.wrap(tx.hashTransaction()));
+                    if (removed != null) {
+                        removedTxHashes.add(removed.getTx().hashTransaction());
                     }
                 });
                 // send updated tx pool to miners (which txs are no longer in pool)

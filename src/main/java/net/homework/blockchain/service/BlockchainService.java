@@ -61,10 +61,19 @@ public class BlockchainService {
         return transactionRepository.findTransactionByHashTx(txHash).orElse(null);
     }
 
-    public boolean isCoinbaseTxMature(byte[] coinbaseTxHash) {
-        Block block = blockRepository.findBlockByTransactionsContains(transactionRepository.findTransactionByHashTx(coinbaseTxHash).get()).get();
-        long height = block.getHeight();
-        return blockRepository.findById(height + Config.COINBASE_MATURITY).isPresent();
+    public boolean isCoinbaseTxImmature(byte[] coinbaseTxHash) {
+        Optional<Transaction> optTx = transactionRepository.findTransactionByHashTx(coinbaseTxHash);
+        // if coinbase is on chain
+        if (optTx.isPresent()) {
+            Optional<Block> optBlock = blockRepository.findBlockByTransactionsContains(optTx.get());
+            if (optBlock.isPresent()) {
+                Block block = optBlock.get();
+                long height = block.getHeight();
+                return !blockRepository.findById(height + Config.COINBASE_MATURITY).isPresent();
+            }
+        }
+        // coinbase not on chain, immature
+        return true;
     }
 
     @Deprecated
@@ -122,9 +131,7 @@ public class BlockchainService {
         AtomicLong bal = new AtomicLong();
         utxos.forEach((txHash, indexes) -> {
             List<Transaction.Output> outputs = getTransactionOnChain(txHash.array()).getOutputs();
-            indexes.forEach(index -> {
-                bal.addAndGet(outputs.get(index).getValue());
-            });
+            indexes.forEach(index -> bal.addAndGet(outputs.get(index).getValue()));
         });
         return bal.get();
     }

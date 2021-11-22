@@ -14,8 +14,6 @@ public interface Miner {
 
     List<Transaction> createCoinbase(byte[] hashPrevBlock);
 
-    void updateReward(Block block);
-
     void updateReward(Block block, long extraFee);
 
     void initLocalPool();

@@ -17,9 +17,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class MinerImpl implements Miner {
 
@@ -30,7 +28,6 @@ public class MinerImpl implements Miner {
     private InetAddress node;
     private byte[] publicKeyHash;
     private String urlLatestHash;
-    private String urlTotalInput;
     private String urlInitLocalPool;
 
 
@@ -107,35 +104,6 @@ public class MinerImpl implements Miner {
     }
 
     @Override
-    public void updateReward(Block block) {
-        long feePrev = block.getTransactions().get(0).getOutputs().get(0).getValue();
-        long outputSum = 0L;
-        Map<String, Object> map = new HashMap<>();
-        for (Transaction tx : block.getTransactions()) {
-            for (Transaction.Output output : tx.getOutputs()) {
-                outputSum += output.getValue();
-            }
-            for (Transaction.Input input : tx.getInputs()) {
-                String key = Hex.encodeHexString(input.getPreviousTransactionHash(), false);
-                if (!map.containsKey(key)) {
-                    List<Integer> list = new ArrayList<>();
-                    list.add(input.getOutIndex());
-                    map.put(key, list);
-                } else {
-                    ((List<Integer>) map.get(key)).add(input.getOutIndex());
-                }
-            }
-        }
-        map.replaceAll((k, v) -> ((List<Integer>) map.get(k)).stream().map(Object::toString).collect(Collectors.joining(",")));
-        long inputSum = Long.parseLong(HttpRequest.post(urlTotalInput)
-                .timeout(5000)
-                .body(ByteUtils.toJson(map))
-                .execute().body());
-        long minerFeeSum = outputSum - inputSum;
-        block.getTransactions().get(0).getOutputs().get(0).setValue(feePrev + minerFeeSum);
-    }
-
-    @Override
     public void updateReward(Block block, long extraFee) {
         long feePrev = block.getTransactions().get(0).getOutputs().get(0).getValue();
         block.getTransactions().get(0).getOutputs().get(0).setValue(feePrev + extraFee);
@@ -193,8 +161,8 @@ public class MinerImpl implements Miner {
                 // better implementation possibly?
                 List<Object> toRemove = ByteUtils.fromBytes(msg, new ArrayList<>());
                 if (toRemove != null) {
-                    toRemove.replaceAll(o -> ByteBuffer.wrap((byte[]) o));
-                    this.localTxPool.removeIf(wrappedTx -> toRemove.contains(ByteBuffer.wrap(wrappedTx.getTx().hashTransaction())));
+                    toRemove.replaceAll(o -> Hex.encodeHexString((byte[]) o, false));
+                    this.localTxPool.removeIf(wrappedTx -> toRemove.contains(Hex.encodeHexString(wrappedTx.getTx().hashTransaction(), false)));
                 }
             }
         }
@@ -205,7 +173,6 @@ public class MinerImpl implements Miner {
     public void init(String[] args) {
         LOGGER.info("Starting...");
         this.urlLatestHash = String.format("%s:%d/latestBlockHash", args[0], Config.PORT_HTTP);
-        this.urlTotalInput = String.format("%s:%d/totalInput", args[0], Config.PORT_HTTP);
         this.urlInitLocalPool = String.format("%s:%d/txPool", args[0], Config.PORT_HTTP);
         this.node = InetAddress.getByName(args[0]);
         this.publicKeyHash = CryptoUtils.getPublicKeyHashFromAddress(args[1]);
