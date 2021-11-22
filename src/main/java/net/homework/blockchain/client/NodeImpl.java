@@ -13,10 +13,7 @@ import net.homework.blockchain.util.VerifyUtils;
 import org.apache.commons.codec.binary.Hex;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.*;
 
@@ -32,67 +29,61 @@ public class NodeImpl implements Node {
     public static Map<ByteBuffer, Block> ORPHAN_BLOCKS = new HashMap<>();
 
     private final List<ListeningThread> threads = new ArrayList<>();
+    private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_OUT);
 
-    @Override
-    public void listenForTransaction() {
-        ListeningThread thread = new ListeningThread(Config.PORT_TX_BROADCAST_IN) {
-            @Override
-            public void digest(byte[] data, DatagramPacket packet) {
-                Transaction tx = ByteUtils.fromBytes(data, new Transaction());
-                String hashString = tx == null ? "null" : Hex.encodeHexString(tx.hashTransaction(), false);
-                LOGGER.info(String.format("Node - Received transaction with hash %s from %s", hashString, packet.getAddress().toString()));
-                boolean accepted = false;
-                // Check that size in bytes >= 100
-                if (packet.getLength() >= 100) {
-                    // verify this transaction
-                    accepted = VerifyUtils.verifyTx(tx, TX_POOL, ORPHAN_TXS);
-                }
-                // send accepted msg back
-                NetworkUtils.sendPacket(packet.getAddress(), Config.PORT_MSG_OUT, MsgUtils.toTxMsg(accepted), Config.PORT_MSG_IN);
-                LOGGER.info(String.format("Node - %s transaction with hash %s from %s", accepted ? "Accepted" : "Rejected", hashString, packet.getAddress().toString()));
-            }
-        };
-        threads.add(thread);
-        thread.start();
-    }
-
-    @Override
-    public void listenForNewBlock() {
-        ListeningThread thread = new ListeningThread(Config.PORT_BLOCK_BROADCAST_IN) {
-            @Override
-            public void digest(byte[] data, DatagramPacket packet) {
-                Block block = ByteUtils.fromBytes(data, new Block());
-                String hashString = block == null ? "null" : Hex.encodeHexString(block.hashHeader(), false);
-                LOGGER.info(String.format("Node - Received block with hash %s from %s", hashString, packet.getAddress().toString()));
-                boolean accepted = VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL);
-                NetworkUtils.sendPacket(packet.getAddress(), Config.PORT_MSG_OUT, MsgUtils.toBlockMsg(accepted), Config.PORT_MSG_IN);
-                LOGGER.info(String.format("Node - %s block with hash %s from %s", accepted ? "Accepted" : "Rejected", hashString, packet.getAddress().toString()));
-            }
-        };
-        threads.add(thread);
-        thread.start();
+    public NodeImpl() throws SocketException {
     }
 
     @Override
     public void listenForMsg() {
-        ListeningThread thread = new ListeningThread(Config.PORT_MSG_IN) {
-            @Override
-            public void digest(byte[] data, DatagramPacket packet) {
-                // only listen for BLOCK_REQUEST
-                if (MsgUtils.isBlockRequestMsg(data)) {
-                    byte[] headerHash = Arrays.copyOfRange(data, 1, data.length);
-                    LOGGER.info(String.format("Node - Received block query with hash %s from %s", Hex.encodeHexString(headerHash, false), packet.getAddress().toString()));
-                    byte[] blockBytes = blockchainService.getBlockOnChainByHash(headerHash).toBytes();
-                    NetworkUtils.sendPacket(packet.getAddress(), Config.PORT_BLOCK_BROADCAST_OUT, blockBytes, Config.PORT_BLOCK_BROADCAST_IN);
+        try {
+            ListeningThread thread = new ListeningThread() {
+                @Override
+                public void digest(byte[] data, DatagramPacket packet) {
+                    switch (data[0]) {
+                        case MsgUtils.TX_NEW: {
+                            Transaction tx = ByteUtils.fromBytes(Arrays.copyOfRange(data, 1, data.length), new Transaction());
+                            String hashString = tx == null ? "null" : Hex.encodeHexString(tx.hashTransaction(), false);
+                            LOGGER.info(String.format("Received transaction with hash %s from %s", hashString, packet.getAddress().toString()));
+                            boolean accepted = false;
+                            // Check that size in bytes >= 100
+                            if (packet.getLength() >= 100) {
+                                // verify this transaction
+                                accepted = VerifyUtils.verifyTx(tx, TX_POOL, ORPHAN_TXS, socketOut);
+                            }
+                            // send accepted msg back
+                            NetworkUtils.sendPacket(socketOut, MsgUtils.toTxMsg(accepted), packet.getAddress());
+                            LOGGER.info(String.format("%s transaction with hash %s from %s", accepted ? "Accepted" : "Rejected", hashString, packet.getAddress().toString()));
+                            break;
+                        }
+                        case MsgUtils.BLOCK_NEW: {
+                            Block block = ByteUtils.fromBytes(Arrays.copyOfRange(data, 1, data.length), new Block());
+                            String hashString = block == null ? "null" : Hex.encodeHexString(block.hashHeader(), false);
+                            LOGGER.info(String.format("Received block with hash %s from %s", hashString, packet.getAddress().toString()));
+                            boolean accepted = VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL, socketOut);
+                            NetworkUtils.sendPacket(socketOut, MsgUtils.toBlockMsg(accepted), packet.getAddress());
+                            LOGGER.info(String.format("%s block with hash %s from %s", accepted ? "Accepted" : "Rejected", hashString, packet.getAddress().toString()));
+                            break;
+                        }
+                        case MsgUtils.BLOCK_REQUESTED: {
+                            byte[] headerHash = Arrays.copyOfRange(data, 1, data.length);
+                            LOGGER.info(String.format("Received block query with hash %s from %s", Hex.encodeHexString(headerHash, false), packet.getAddress().toString()));
+                            byte[] blockMsg = blockchainService.getBlockOnChainByHash(headerHash).toMsg();
+                            NetworkUtils.sendPacket(socketOut, blockMsg, packet.getAddress());
+                            break;
+                        }
+                    }
                 }
-            }
-        };
-        threads.add(thread);
-        thread.start();
+            };
+            threads.add(thread);
+            thread.start();
+        } catch (SocketException e) {
+            e.printStackTrace();
+        }
     }
 
     public void gracefulShutdown() {
-        LOGGER.info("Node - Shutdown initiated...");
+        LOGGER.info("Shutdown initiated...");
         for (ListeningThread t : threads) {
             try {
                 // if a thread is blocked by receive, interrupt it (no processing in place, we're fine)
@@ -102,43 +93,38 @@ public class NodeImpl implements Node {
                 e.printStackTrace();
             }
         }
-        LOGGER.info("Node - Shutdown completed.");
+        LOGGER.info("Shutdown completed.");
     }
 
     @Override
     public void init() {
-        LOGGER.info("Node - Starting...");
+        LOGGER.info("Starting...");
         this.listenForMsg();
-        this.listenForNewBlock();
-        this.listenForTransaction();
-        LOGGER.info("Node - Start completed.");
+        LOGGER.info("Start completed.");
     }
 
     private static abstract class ListeningThread extends Thread {
-        private final int portIn;
-        private DatagramSocket socket;
+        private final DatagramSocket socketIn = new DatagramSocket(Config.PORT_IN);
 
-        public ListeningThread(int portIn) {
-            this.portIn = portIn;
+        public ListeningThread() throws SocketException {
         }
 
         public abstract void digest(byte[] data, DatagramPacket packet);
 
         public void close() {
-            this.socket.close();
+            this.socketIn.close();
         }
 
         @Override
         public void run() {
             try {
-                socket = new DatagramSocket(portIn);
                 byte[] data;
                 DatagramPacket packet;
-                while (!socket.isClosed()) {
+                while (!socketIn.isClosed()) {
                     data = new byte[32768];
                     packet = new DatagramPacket(data, data.length);
                     // blocking
-                    socket.receive(packet);
+                    socketIn.receive(packet);
                     // skips localhost packets
                     InetAddress address = packet.getAddress();
                     if (address.isAnyLocalAddress() || address.isLoopbackAddress() || NetworkInterface.getByInetAddress(address) != null) {
@@ -148,7 +134,7 @@ public class NodeImpl implements Node {
                     DatagramPacket finalPacket = packet;
                     new Thread(() -> digest(finalData, finalPacket)).start();
                 }
-            } catch (IOException e) {
+            } catch (IOException ignored) {
 
             }
         }

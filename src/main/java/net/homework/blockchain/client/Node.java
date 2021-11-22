@@ -6,10 +6,6 @@ import org.slf4j.LoggerFactory;
 public interface Node {
     Logger LOGGER = LoggerFactory.getLogger(Node.class);
 
-    void listenForTransaction();
-
-    void listenForNewBlock();
-
     void listenForMsg();
 
     void init();

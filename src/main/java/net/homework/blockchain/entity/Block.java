@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import net.homework.blockchain.Config;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
+import net.homework.blockchain.util.MsgUtils;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -18,7 +19,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-public class Block {
+public class Block implements IMessage {
 
     @JsonIgnore
     private byte[] hashBlock;
@@ -69,6 +70,12 @@ public class Block {
         this.header.merkleTree = new MerkleTree(tree);
     }
 
+    @Override
+    public byte msgType() {
+        return MsgUtils.BLOCK_NEW;
+    }
+
+    @Override
     public byte[] toBytes() {
         return ByteUtils.toBytes(this);
     }
@@ -141,12 +148,4 @@ public class Block {
             return CryptoUtils.sha256Twice(ByteUtils.toBytes(this));
         }
     }
-
-    /*
-      Mining:
-       construct a new block, add txs
-       while block is not valid
-           increment()
-       send to node
-     */
 }

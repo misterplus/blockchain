@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
+import net.homework.blockchain.util.MsgUtils;
 
 import javax.persistence.*;
 import java.util.List;
@@ -12,7 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 @Data
 @Entity
-public class Transaction {
+public class Transaction implements IMessage {
     // we use eager here cause everytime we fetch a transaction we would always need these lists
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderColumn(name = "input_index_in_tx")
@@ -46,6 +47,12 @@ public class Transaction {
         return CryptoUtils.sha256(toBytes());
     }
 
+    @Override
+    public byte msgType() {
+        return MsgUtils.TX_NEW;
+    }
+
+    @Override
     public byte[] toBytes() {
         return ByteUtils.toBytes(this);
     }

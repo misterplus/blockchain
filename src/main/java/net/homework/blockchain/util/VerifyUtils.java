@@ -7,6 +7,7 @@ import net.homework.blockchain.entity.Transaction;
 import net.homework.blockchain.entity.WrappedTransaction;
 import net.homework.blockchain.service.BlockchainService;
 
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -75,7 +76,7 @@ public class VerifyUtils {
         return outputSum;
     }
 
-    public static boolean verifyTx(Transaction tx, Map<ByteBuffer, WrappedTransaction> txPool, Map<ByteBuffer, Transaction> orphanTxs) {
+    public static boolean verifyTx(Transaction tx, Map<ByteBuffer, WrappedTransaction> txPool, Map<ByteBuffer, Transaction> orphanTxs, DatagramSocket socketOut) {
         // Check syntactic correctness
         if (tx == null) {
             return false;
@@ -169,10 +170,10 @@ public class VerifyUtils {
         txPool.put(ByteBuffer.wrap(txHash), wrapped);
 
         // Broadcast transaction to nodes
-        NetworkUtils.broadcastAsync(Config.PORT_TX_BROADCAST_OUT, tx.toBytes(), Config.PORT_TX_BROADCAST_IN);
+        NetworkUtils.broadcast(socketOut, tx.toMsg());
 
         // send new tx in pool (txHash/tx) to miners
-        NetworkUtils.broadcastAsync(Config.PORT_MSG_OUT, wrapped.toMsg(), Config.PORT_MSG_IN);
+        NetworkUtils.broadcast(socketOut, wrapped.toMsg());
 
         /*
             For each orphan transaction that uses this one as one of its inputs,
@@ -180,7 +181,7 @@ public class VerifyUtils {
          */
         for (Transaction orphan : orphanTxs.values()) {
             if (orphan.getInputs().stream().anyMatch(input -> isTxSpentByInput(tx, input))) {
-                verifyTx(orphan, txPool, orphanTxs);
+                verifyTx(orphan, txPool, orphanTxs, socketOut);
             }
         }
         return true;
@@ -190,7 +191,7 @@ public class VerifyUtils {
         return Arrays.equals(input.getPreviousTransactionHash(), tx.hashTransaction()) && tx.getOutputs().size() > input.getOutIndex();
     }
 
-    public static boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, WrappedTransaction> txPool) {
+    public static boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, WrappedTransaction> txPool, DatagramSocket socketOut) {
         // Check syntactic correctness
         if (block == null) {
             return false;
@@ -239,7 +240,7 @@ public class VerifyUtils {
             // orphan block, add this to orphan blocks
             orphanBlocks.put(ByteBuffer.wrap(headerHash), block);
             // then query peer we got this from for orphan's parent
-            NetworkUtils.sendPacketAsync(fromPeer, Config.PORT_MSG_OUT, MsgUtils.toBlockRequestMsg(headerHash), Config.PORT_MSG_IN);
+            NetworkUtils.sendPacket(socketOut, MsgUtils.toBlockRequestMsg(headerHash), fromPeer);
         } else {
             // if prevBlock already has a son, we reject this block completely (no multi-branch implementation for simplicity reasons)
             if (!blockchainService.isSonPresentForParentBlock(prevBlock.hashHeader())) {
@@ -320,18 +321,18 @@ public class VerifyUtils {
                     }
                 });
                 // send updated tx pool to miners (which txs are no longer in pool)
-                NetworkUtils.broadcastAsync(Config.PORT_MSG_OUT, MsgUtils.toRemoveMsg(removedTxHashes), Config.PORT_MSG_IN);
+                NetworkUtils.broadcast(socketOut, MsgUtils.toRemoveMsg(removedTxHashes));
 
                 // Add to chain
                 blockchainService.addBlockToChain(block);
                 // Broadcast block to our peers
-                NetworkUtils.broadcastAsync(Config.PORT_BLOCK_BROADCAST_OUT, block.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
+                NetworkUtils.broadcast(socketOut, block.toMsg());
 
                 // For each orphan block for which this block is its prev, run all these steps (including this one) recursively on that orphan
                 orphanBlocks.values().forEach(orphanBlock -> {
                     if (Arrays.equals(headerHash, orphanBlock.getHeader().getHashPrevBlock())) {
                         try {
-                            verifyBlock(orphanBlock, InetAddress.getLocalHost(), orphanBlocks, txPool);
+                            verifyBlock(orphanBlock, InetAddress.getLocalHost(), orphanBlocks, txPool, socketOut);
                         } catch (UnknownHostException e) {
                             e.printStackTrace();
                         }

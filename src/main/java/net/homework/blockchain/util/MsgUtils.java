@@ -15,6 +15,8 @@ public class MsgUtils {
     public final static byte TX_POOL_ADD = -1; // + a list of wrapped txs | node to miner
     public final static byte TX_POOL_REMOVE = -2; // + a list of tx hashes | node to miner
     public final static byte BLOCK_REQUESTED = -3; // + requested block's hash | node to node
+    public final static byte BLOCK_NEW = -4; // + new block's bytes | node to node | miner to node
+    public final static byte TX_NEW = -5; // + new tx's bytes | node to node | user to node
 
     public static boolean isBlockAccepted(byte[] data) {
         return data[0] == BLOCK_ACCEPTED;
@@ -38,10 +40,6 @@ public class MsgUtils {
 
     public static boolean isBlockMsg(byte[] data) {
         return isBlockAccepted(data) || isBlockRejected(data);
-    }
-
-    public static boolean isBlockRequestMsg(byte[] data) {
-        return data[0] == BLOCK_REQUESTED;
     }
 
     public static byte[] toBlockRequestMsg(byte[] part) {

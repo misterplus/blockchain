@@ -9,7 +9,7 @@ import net.homework.blockchain.util.MsgUtils;
 @NoArgsConstructor
 @Data
 @AllArgsConstructor
-public class WrappedTransaction implements Comparable<Long> {
+public class WrappedTransaction implements Comparable<Long>, IMessage {
 
     private Transaction tx;
     private long fee;
@@ -23,15 +23,13 @@ public class WrappedTransaction implements Comparable<Long> {
         return Long.compare(this.fee, o);
     }
 
-    public byte[] toBytes() {
-        return ByteUtils.toBytes(this);
+    @Override
+    public byte msgType() {
+        return MsgUtils.TX_POOL_ADD;
     }
 
-    public byte[] toMsg() {
-        byte[] part = toBytes();
-        byte[] msg = new byte[part.length + 1];
-        msg[0] = MsgUtils.TX_POOL_ADD;
-        System.arraycopy(part, 0, msg, 1, part.length);
-        return msg;
+    @Override
+    public byte[] toBytes() {
+        return ByteUtils.toBytes(this);
     }
 }

@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -24,6 +25,7 @@ public class MinerImpl implements Miner {
 
     private final PriorityQueue<WrappedTransaction> localTxPool = new PriorityQueue<>();
     private final List<WrappedTransaction> revertList = new ArrayList<>();
+    private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_OUT);
     private final MessageThread msgThread = new MessageThread();
     private InetAddress node;
     private byte[] publicKeyHash;
@@ -32,18 +34,18 @@ public class MinerImpl implements Miner {
     private String urlInitLocalPool;
 
 
-    private MinerImpl() {
+    private MinerImpl() throws SocketException {
     }
 
     @SneakyThrows
     public static void main(String[] args) {
         MinerImpl miner = new MinerImpl();
         miner.init(args);
-        LOGGER.info("Miner - Entering main work loop...");
+        LOGGER.info("Entering main work loop...");
         while (true) {
             String latestHash = miner.getLatestBlockHash();
-            LOGGER.info(String.format("Miner - Latest block hash is %s.", latestHash));
-            LOGGER.info("Miner - Creating new block...");
+            LOGGER.info(String.format("Latest block hash is %s.", latestHash));
+            LOGGER.info("Creating new block...");
             miner.msgThread.resetBeaten();
             Block newBlock = new Block(Hex.decodeHex(latestHash), miner.createCoinbase());
             // try filling block, might be full, might not be (local pool not empty)
@@ -63,9 +65,9 @@ public class MinerImpl implements Miner {
                 newBlock.increment();
             }
             if (success) {
-                LOGGER.info(String.format("Miner - Block with hash %s is solved with nonce %d.", Hex.encodeHexString(newBlock.hashHeader()), newBlock.getHeader().getNonce()));
+                LOGGER.info(String.format("Block with hash %s is solved with nonce %d.", Hex.encodeHexString(newBlock.hashHeader(), false), newBlock.getHeader().getNonce()));
                 // submit to node
-                NetworkUtils.sendPacket(miner.node, Config.PORT_BLOCK_BROADCAST_OUT, newBlock.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
+                NetworkUtils.sendPacket(miner.socketOut, newBlock.toMsg(), miner.node);
                 // wait for reply
                 synchronized (miner.msgThread.blockMsgs) {
                     miner.msgThread.blockMsgs.wait();
@@ -73,16 +75,16 @@ public class MinerImpl implements Miner {
                 byte[] data = miner.msgThread.blockMsgs.poll();
                 if (MsgUtils.isBlockAccepted(data)) {
                     // block solved by us and accepted by node
-                    LOGGER.info(String.format("Miner - Block with hash %s is accepted.", Hex.encodeHexString(newBlock.hashHeader(), false)));
+                    LOGGER.info(String.format("Block with hash %s is accepted.", Hex.encodeHexString(newBlock.hashHeader(), false)));
                 } else if (MsgUtils.isBlockRejected(data)) {
                     // block solved by us but rejected by node, revert local pool, as if we did not solve this block
                     miner.localTxPool.addAll(miner.revertList);
-                    LOGGER.info(String.format("Miner - Block with hash %s is rejected.", Hex.encodeHexString(newBlock.hashHeader(), false)));
+                    LOGGER.info(String.format("Block with hash %s is rejected.", Hex.encodeHexString(newBlock.hashHeader(), false)));
                 }
             } else {
                 // block solved by others, revert local pool, as if we did not solve this block
                 miner.localTxPool.addAll(miner.revertList);
-                LOGGER.info(String.format("Miner - Block with hash %s is already solved by others, discarding...", Hex.encodeHexString(newBlock.hashHeader())));
+                LOGGER.info(String.format("Block with hash %s is already solved by others, discarding...", Hex.encodeHexString(newBlock.hashHeader(), false)));
             }
             // clear the revert list no matter what
             miner.revertList.clear();
@@ -201,7 +203,7 @@ public class MinerImpl implements Miner {
     @SneakyThrows
     @Override
     public void init(String[] args) {
-        LOGGER.info("Miner - Starting...");
+        LOGGER.info("Starting...");
         this.urlLatestHash = String.format("%s:%d/latestBlockHash", args[0], Config.PORT_HTTP);
         this.urlTotalInput = String.format("%s:%d/totalInput", args[0], Config.PORT_HTTP);
         this.urlInitLocalPool = String.format("%s:%d/txPool", args[0], Config.PORT_HTTP);
@@ -209,7 +211,7 @@ public class MinerImpl implements Miner {
         this.publicKeyHash = CryptoUtils.getPublicKeyHashFromAddress(args[1]);
         this.initLocalPool();
         this.msgThread.start();
-        LOGGER.info("Miner - Start completed.");
+        LOGGER.info("Start completed.");
     }
 
     private static class MessageThread extends Thread {
@@ -218,7 +220,11 @@ public class MinerImpl implements Miner {
         // remove: txs to remove from the current local pool, which means another block was submitted and accepted, stop hashing the current block and discard it
         private final Queue<byte[]> poolMsgs = new LinkedList<>();
         private final Queue<byte[]> blockMsgs = new LinkedList<>();
+        private final DatagramSocket socketIn = new DatagramSocket(Config.PORT_IN);
         private boolean beaten = false;
+
+        private MessageThread() throws SocketException {
+        }
 
         public boolean isBeaten() {
             return beaten;
@@ -231,13 +237,12 @@ public class MinerImpl implements Miner {
         @Override
         public void run() {
             try {
-                DatagramSocket socket = new DatagramSocket(Config.PORT_MSG_IN);
                 byte[] data;
                 DatagramPacket packet;
-                while (!socket.isClosed()) {
+                while (!socketIn.isClosed()) {
                     data = new byte[32768];
                     packet = new DatagramPacket(data, data.length);
-                    socket.receive(packet);
+                    socketIn.receive(packet);
                     boolean isRemove = MsgUtils.isMsgRemove(data);
                     // add to queue
                     if (isRemove) {

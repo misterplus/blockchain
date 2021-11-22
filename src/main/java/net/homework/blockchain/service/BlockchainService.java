@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -158,10 +159,13 @@ public class BlockchainService {
     public void startNode() {
         node = new Thread(() -> {
             synchronized (this) {
-                Node node = new NodeImpl();
-                node.init();
+                Node node = null;
                 try {
+                    node = new NodeImpl();
+                    node.init();
                     wait();
+                } catch (SocketException e) {
+                    e.printStackTrace();
                 } catch (InterruptedException e) {
                     node.gracefulShutdown();
                 }
