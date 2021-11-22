@@ -59,6 +59,7 @@ public class Transaction implements IMessage {
 
     @Data
     @Entity
+    @NoArgsConstructor
     public static class Input {
 
         private byte[] previousTransactionHash;
@@ -86,10 +87,10 @@ public class Transaction implements IMessage {
         /**
          * Construct a coinbase transaction input
          */
-        public Input() {
+        public Input(byte[] hashPrevBlock) {
             this.previousTransactionHash = new byte[]{0};
             this.outIndex = -1;
-            this.scriptSig = new byte[]{0};
+            this.scriptSig = hashPrevBlock;
             this.scriptPubKey = new byte[]{0};
         }
 

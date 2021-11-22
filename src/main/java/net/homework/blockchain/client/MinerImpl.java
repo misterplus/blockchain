@@ -47,7 +47,7 @@ public class MinerImpl implements Miner {
             LOGGER.info(String.format("Latest block hash is %s.", latestHash));
             LOGGER.info("Creating new block...");
             miner.msgThread.resetBeaten();
-            Block newBlock = new Block(Hex.decodeHex(latestHash), miner.createCoinbase());
+            Block newBlock = new Block(Hex.decodeHex(latestHash), miner.createCoinbase(Hex.decodeHex(latestHash)));
             // try filling block, might be full, might not be (local pool not empty)
             boolean blockFull = miner.fillBlock(newBlock);
             // do pow stuff
@@ -99,9 +99,9 @@ public class MinerImpl implements Miner {
     }
 
     @Override
-    public List<Transaction> createCoinbase() {
+    public List<Transaction> createCoinbase(byte[] hashPrevBlock) {
         List<Transaction> transactions = new ArrayList<>();
-        Transaction tx = new Transaction(Collections.singletonList(new Transaction.Input()), Collections.singletonList(new Transaction.Output(Config.BLOCK_FEE, publicKeyHash)));
+        Transaction tx = new Transaction(Collections.singletonList(new Transaction.Input(hashPrevBlock)), Collections.singletonList(new Transaction.Output(Config.BLOCK_FEE, publicKeyHash)));
         transactions.add(tx);
         return transactions;
     }
@@ -186,10 +186,10 @@ public class MinerImpl implements Miner {
             byte[] multiPart = msgs.poll();
             // add or remove shit
             byte[] msg = Arrays.copyOfRange(multiPart, 1, multiPart.length);
-            if (MsgUtils.isMsgAdd(msg)) {
+            if (MsgUtils.isMsgAdd(multiPart)) {
                 List<WrappedTransaction> toAdd = ByteUtils.fromBytes(msg, new ArrayList<>());
                 this.localTxPool.addAll(toAdd);
-            } else if (MsgUtils.isMsgRemove(msg)) {
+            } else if (MsgUtils.isMsgRemove(multiPart)) {
                 // better implementation possibly?
                 List<Object> toRemove = ByteUtils.fromBytes(msg, new ArrayList<>());
                 if (toRemove != null) {

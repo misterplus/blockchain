@@ -31,6 +31,10 @@ public class VerifyUtils {
         }
     }
 
+    public static boolean isCoinbasePointedToLastBlock(Transaction tx, byte[] hashPrevBlock) {
+        return Arrays.equals(tx.getInputs().get(0).getScriptSig(), hashPrevBlock);
+    }
+
     public static boolean isCoinbaseInput(Transaction.Input input) {
         return ByteUtils.isZero(input.getPreviousTransactionHash()) && input.getOutIndex() == -1;
     }
@@ -213,6 +217,10 @@ public class VerifyUtils {
         }
         // First transaction must be coinbase (i.e. only 1 input, with hash=0, n=-1), the rest must not be
         if (!isCoinbaseTx(txs.get(0))) {
+            return false;
+        }
+        // coinbase tx's scriptSig must point to hashPrevBlock (to preserve unique hash)
+        if (!isCoinbasePointedToLastBlock(txs.get(0), header.getHashPrevBlock())) {
             return false;
         }
         if (txs.subList(1, txs.size()).stream().anyMatch(VerifyUtils::isCoinbaseTx)) {

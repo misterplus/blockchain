@@ -12,7 +12,7 @@ public interface Miner {
 
     String getLatestBlockHash();
 
-    List<Transaction> createCoinbase();
+    List<Transaction> createCoinbase(byte[] hashPrevBlock);
 
     void updateReward(Block block);
 
