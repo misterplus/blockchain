@@ -2,10 +2,14 @@ package net.homework.blockchain.client;
 
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 public interface Miner {
+    Logger LOGGER = LoggerFactory.getLogger(Miner.class);
+
     String getLatestBlockHash();
 
     List<Transaction> createCoinbase();
@@ -18,5 +22,7 @@ public interface Miner {
 
     boolean fillBlock(Block block);
 
-    void digestMsgs();
+    void digestPoolMsgs();
+
+    void init(String[] args);
 }

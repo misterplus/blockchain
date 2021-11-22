@@ -230,7 +230,7 @@ public class VerifyUtils {
         byte[] merkleHash = header.getHashMerkleRoot();
         block.reconstructMerkleTree();
         byte[] calculatedMerkleHash = header.getMerkleTree().hashMerkleTree();
-        if (merkleHash != calculatedMerkleHash) {
+        if (!Arrays.equals(merkleHash, calculatedMerkleHash)) {
             return false;
         }
         // Check if prev block is on-chain.

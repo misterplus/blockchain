@@ -18,5 +18,7 @@ public interface Config {
     int MAX_BLOCK_SIZE = 32768;
     // 5 btc
     long BLOCK_FEE = 500000000L;
+    // for debugging
+    int PORT_PLACEHOLDER = 10239;
 
 }

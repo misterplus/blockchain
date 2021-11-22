@@ -39,16 +39,13 @@ public class MinerImpl implements Miner {
     @SneakyThrows
     public static void main(String[] args) {
         MinerImpl miner = new MinerImpl();
-        miner.urlLatestHash = String.format("%s:%d/block/latestHash", args[0], Config.PORT_HTTP);
-        miner.urlTotalInput = String.format("%s:%d/totalInput", args[0], Config.PORT_HTTP);
-        miner.urlInitLocalPool = String.format("%s:%d/txPool", args[0], Config.PORT_HTTP);
-        miner.node = InetAddress.getByName(args[0]);
-        miner.address = args[1];
-        miner.publicKeyHash = CryptoUtils.getPublicKeyHashFromAddress(args[1]);
-        miner.initLocalPool();
-        miner.msgThread.start();
+        miner.init(args);
+        LOGGER.info("Miner - Entering main work loop...");
         while (true) {
             String latestHash = miner.getLatestBlockHash();
+            LOGGER.info(String.format("Miner - Latest block hash is %s.", latestHash));
+            LOGGER.info("Miner - Creating new block...");
+            miner.msgThread.resetBeaten();
             Block newBlock = new Block(Hex.decodeHex(latestHash), miner.createCoinbase());
             // try filling block, might be full, might not be (local pool not empty)
             boolean blockFull = miner.fillBlock(newBlock);
@@ -67,31 +64,26 @@ public class MinerImpl implements Miner {
                 newBlock.increment();
             }
             if (success) {
-                System.out.printf("[MSG]Block with hash %s is solved with nonce %d!", Hex.encodeHexString(newBlock.hashHeader()), newBlock.getHeader().getNonce());
+                LOGGER.info(String.format("Miner - Block with hash %s is solved with nonce %d.", Hex.encodeHexString(newBlock.hashHeader()), newBlock.getHeader().getNonce()));
                 // submit to node
                 NetworkUtils.sendPacket(miner.node, Config.PORT_BLOCK_BROADCAST_OUT, newBlock.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
                 // wait for reply
-                DatagramSocket socket = new DatagramSocket(Config.PORT_MSG_IN);
-                byte[] data = new byte[]{0};
-                DatagramPacket packet;
-                while (!MsgUtils.isBlockMsg(data)) {
-                    data = new byte[32768];
-                    packet = new DatagramPacket(data, data.length);
-                    socket.receive(packet);
-                    if (MsgUtils.isBlockAccepted(data)) {
-                        // block solved by us and accepted by node
-                        System.out.printf("[MSG]Block with hash %s is accepted!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
-                    } else if (MsgUtils.isBlockRejected(data)) {
-                        // block solved by us but rejected by node, revert local pool, as if we did not solve this block
-                        miner.localTxPool.addAll(miner.revertList);
-                        System.out.printf("[MSG]Block with hash %s is rejected!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
-                    }
+                synchronized (miner.msgThread.blockMsgs) {
+                    miner.msgThread.blockMsgs.wait();
+                }
+                byte[] data = miner.msgThread.blockMsgs.poll();
+                if (MsgUtils.isBlockAccepted(data)) {
+                    // block solved by us and accepted by node
+                    LOGGER.info(String.format("Miner - Block with hash %s is accepted.", Hex.encodeHexString(newBlock.hashHeader(), false)));
+                } else if (MsgUtils.isBlockRejected(data)) {
+                    // block solved by us but rejected by node, revert local pool, as if we did not solve this block
+                    miner.localTxPool.addAll(miner.revertList);
+                    LOGGER.info(String.format("Miner - Block with hash %s is rejected.", Hex.encodeHexString(newBlock.hashHeader(), false)));
                 }
             } else {
                 // block solved by others, revert local pool, as if we did not solve this block
                 miner.localTxPool.addAll(miner.revertList);
-                miner.msgThread.resetBeaten();
-                System.out.printf("[MSG]Block with hash %s is already solved by others, discarding!", Hex.encodeHexString(newBlock.hashHeader()));
+                LOGGER.info(String.format("Miner - Block with hash %s is already solved by others, discarding...", Hex.encodeHexString(newBlock.hashHeader())));
             }
             // clear the revert list no matter what
             miner.revertList.clear();
@@ -160,7 +152,7 @@ public class MinerImpl implements Miner {
     public boolean fillBlock(Block newBlock) {
         boolean blockFull = false;
         long extraFee = 0L;
-        digestMsgs();
+        digestPoolMsgs();
         // keep adding txs until block is full or local pool is empty
         while (newBlock.toBytes().length <= Config.MAX_BLOCK_SIZE && !localTxPool.isEmpty()) {
             // get the most valuable one, but don't remove it from the queue
@@ -187,8 +179,8 @@ public class MinerImpl implements Miner {
     }
 
     @Override
-    public void digestMsgs() {
-        Queue<byte[]> msgs = this.msgThread.msgs;
+    public void digestPoolMsgs() {
+        Queue<byte[]> msgs = this.msgThread.poolMsgs;
         while (!msgs.isEmpty()) {
             byte[] multiPart = msgs.poll();
             // add or remove shit
@@ -207,11 +199,27 @@ public class MinerImpl implements Miner {
         }
     }
 
+    @SneakyThrows
+    @Override
+    public void init(String[] args) {
+        LOGGER.info("Miner - Starting...");
+        this.urlLatestHash = String.format("%s:%d/latestBlockHash", args[0], Config.PORT_HTTP);
+        this.urlTotalInput = String.format("%s:%d/totalInput", args[0], Config.PORT_HTTP);
+        this.urlInitLocalPool = String.format("%s:%d/txPool", args[0], Config.PORT_HTTP);
+        this.node = InetAddress.getByName(args[0]);
+        this.address = args[1];
+        this.publicKeyHash = CryptoUtils.getPublicKeyHashFromAddress(args[1]);
+        this.initLocalPool();
+        this.msgThread.start();
+        LOGGER.info("Miner - Start completed.");
+    }
+
     private static class MessageThread extends Thread {
         // two types of msgs: add / remove
         // add: new txs to add, just add it, block is fine
         // remove: txs to remove from the current local pool, which means another block was submitted and accepted, stop hashing the current block and discard it
-        private final Queue<byte[]> msgs = new LinkedList<>();
+        private final Queue<byte[]> poolMsgs = new LinkedList<>();
+        private final Queue<byte[]> blockMsgs = new LinkedList<>();
         private boolean beaten = false;
 
         public boolean isBeaten() {
@@ -238,7 +246,12 @@ public class MinerImpl implements Miner {
                         beaten = true;
                     }
                     if (MsgUtils.isPoolMsg(data)) {
-                        msgs.add(data);
+                        poolMsgs.add(data);
+                    } else if (MsgUtils.isBlockMsg(data)) {
+                        blockMsgs.add(data);
+                        synchronized (blockMsgs) {
+                            blockMsgs.notify();
+                        }
                     }
                 }
             } catch (IOException e) {

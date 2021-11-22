@@ -10,14 +10,12 @@ import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.MsgUtils;
 import net.homework.blockchain.util.NetworkUtils;
 import net.homework.blockchain.util.VerifyUtils;
+import org.apache.commons.codec.binary.Hex;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
+import java.net.*;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class NodeImpl implements Node {
 
@@ -30,36 +28,16 @@ public class NodeImpl implements Node {
     // orphan blocks
     public static Map<ByteBuffer, Block> ORPHAN_BLOCKS = new HashMap<>();
 
-    private final boolean[] halt = new boolean[]{false};
-
-    public static void main(String[] args) {
-        Node node = new NodeImpl();
-        node.init();
-        System.out.println("[MSG]Node is up and running...");
-        try {
-            DatagramSocket socket = new DatagramSocket(Config.PORT_LOCAL_HALT_IN);
-            byte[] data = new byte[]{0};
-            DatagramPacket packet;
-            while (!socket.isClosed() && !MsgUtils.isHaltingMsg(data)) {
-                data = new byte[32768];
-                packet = new DatagramPacket(data, data.length);
-                socket.receive(packet);
-            }
-            socket.close();
-            System.out.println("[MSG]Halting msg received, exiting...");
-            node.halt();
-            // TODO: stop spring as well, maybe rework halting to a http request
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+    private final List<ListeningThread> threads = new ArrayList<>();
 
     @Override
     public void listenForTransaction() {
-        new ListeningThread(Config.PORT_TX_BROADCAST_IN, halt) {
+        ListeningThread thread = new ListeningThread(Config.PORT_TX_BROADCAST_IN) {
             @Override
             public void digest(byte[] data, DatagramPacket packet) {
                 Transaction tx = ByteUtils.fromBytes(data, new Transaction());
+                String hashString = tx == null ? "null" : Hex.encodeHexString(tx.hashTransaction(), false);
+                LOGGER.info(String.format("Node - Received transaction with hash %s from %s", hashString, packet.getAddress().toString()));
                 boolean accepted = false;
                 // Check that size in bytes >= 100
                 if (packet.getLength() >= 100) {
@@ -68,77 +46,107 @@ public class NodeImpl implements Node {
                 }
                 // send accepted msg back
                 NetworkUtils.sendPacket(packet.getAddress(), Config.PORT_MSG_OUT, MsgUtils.toTxMsg(accepted), Config.PORT_MSG_IN);
+                LOGGER.info(String.format("Node - %s transaction with hash %s from %s", accepted ? "Accepted" : "Rejected", hashString, packet.getAddress().toString()));
             }
-        }.start();
+        };
+        threads.add(thread);
+        thread.start();
     }
 
     @Override
     public void listenForNewBlock() {
-        new ListeningThread(Config.PORT_BLOCK_BROADCAST_IN, halt) {
+        ListeningThread thread = new ListeningThread(Config.PORT_BLOCK_BROADCAST_IN) {
             @Override
             public void digest(byte[] data, DatagramPacket packet) {
                 Block block = ByteUtils.fromBytes(data, new Block());
+                String hashString = block == null ? "null" : Hex.encodeHexString(block.hashHeader(), false);
+                LOGGER.info(String.format("Node - Received block with hash %s from %s", hashString, packet.getAddress().toString()));
                 boolean accepted = VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL);
                 NetworkUtils.sendPacket(packet.getAddress(), Config.PORT_MSG_OUT, MsgUtils.toBlockMsg(accepted), Config.PORT_MSG_IN);
+                LOGGER.info(String.format("Node - %s block with hash %s from %s", accepted ? "Accepted" : "Rejected", hashString, packet.getAddress().toString()));
             }
-        }.start();
+        };
+        threads.add(thread);
+        thread.start();
     }
 
     @Override
     public void listenForMsg() {
-        new ListeningThread(Config.PORT_MSG_IN, halt) {
+        ListeningThread thread = new ListeningThread(Config.PORT_MSG_IN) {
             @Override
             public void digest(byte[] data, DatagramPacket packet) {
                 // only listen for BLOCK_REQUEST
                 if (MsgUtils.isBlockRequestMsg(data)) {
                     byte[] headerHash = Arrays.copyOfRange(data, 1, data.length);
+                    LOGGER.info(String.format("Node - Received block query with hash %s from %s", Hex.encodeHexString(headerHash, false), packet.getAddress().toString()));
                     byte[] blockBytes = blockchainService.getBlockOnChainByHash(headerHash).toBytes();
                     NetworkUtils.sendPacket(packet.getAddress(), Config.PORT_BLOCK_BROADCAST_OUT, blockBytes, Config.PORT_BLOCK_BROADCAST_IN);
                 }
             }
-        }.start();
+        };
+        threads.add(thread);
+        thread.start();
     }
 
-    public void halt() {
-        this.halt[0] = true;
+    public void gracefulShutdown() {
+        LOGGER.info("Node - Shutdown initiated...");
+        for (ListeningThread t : threads) {
+            try {
+                // if a thread is blocked by receive, interrupt it (no processing in place, we're fine)
+                t.close();
+                t.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        LOGGER.info("Node - Shutdown completed.");
     }
 
     @Override
     public void init() {
+        LOGGER.info("Node - Starting...");
         this.listenForMsg();
         this.listenForNewBlock();
         this.listenForTransaction();
+        LOGGER.info("Node - Start completed.");
     }
 
     private static abstract class ListeningThread extends Thread {
         private final int portIn;
-        private final boolean[] halt;
+        private DatagramSocket socket;
 
-        public ListeningThread(int portIn, boolean[] halt) {
+        public ListeningThread(int portIn) {
             this.portIn = portIn;
-            this.halt = halt;
         }
 
         public abstract void digest(byte[] data, DatagramPacket packet);
 
+        public void close() {
+            this.socket.close();
+        }
+
         @Override
         public void run() {
             try {
-                DatagramSocket socket = new DatagramSocket(portIn);
+                socket = new DatagramSocket(portIn);
                 byte[] data;
                 DatagramPacket packet;
-                while (!socket.isClosed() && !halt[0]) {
+                while (!socket.isClosed()) {
                     data = new byte[32768];
                     packet = new DatagramPacket(data, data.length);
                     // blocking
                     socket.receive(packet);
+                    // skips localhost packets
+                    InetAddress address = packet.getAddress();
+                    if (address.isAnyLocalAddress() || address.isLoopbackAddress() || NetworkInterface.getByInetAddress(address) != null) {
+                        continue;
+                    }
                     byte[] finalData = data;
                     DatagramPacket finalPacket = packet;
                     new Thread(() -> digest(finalData, finalPacket)).start();
                 }
-                socket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+
             }
         }
     }

@@ -2,6 +2,7 @@ package net.homework.blockchain.service;
 
 import lombok.SneakyThrows;
 import net.homework.blockchain.Config;
+import net.homework.blockchain.client.Node;
 import net.homework.blockchain.client.NodeImpl;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -31,6 +33,8 @@ public class BlockchainService {
     private InputRepository inputRepository;
     @Autowired
     private OutputRepository outputRepository;
+
+    private Thread node;
 
     public Block getBlockOnChainByHash(byte[] headerHash) {
         return blockRepository.findBlockByHashBlock(headerHash).orElse(null);
@@ -152,9 +156,28 @@ public class BlockchainService {
 
     @PostConstruct
     public void startNode() {
-        new Thread(() -> {
-            NodeImpl.main(new String[]{});
-        }).start();
+        node = new Thread(() -> {
+            synchronized(this) {
+                Node node = new NodeImpl();
+                node.init();
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    node.gracefulShutdown();
+                }
+            }
+        });
+        node.start();
+    }
+
+    @PreDestroy
+    public void stopNode() {
+        node.interrupt();
+        try {
+            node.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     @Deprecated
