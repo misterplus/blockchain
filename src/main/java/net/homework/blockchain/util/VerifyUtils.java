@@ -11,6 +11,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.LongStream;
 
 public class VerifyUtils {
@@ -164,12 +165,14 @@ public class VerifyUtils {
         }
 
         // Add to transaction pool
-        txPool.put(ByteBuffer.wrap(txHash), new WrappedTransaction(tx, inputSum - outputSum));
+        WrappedTransaction wrapped = WrappedTransaction.wrap(tx, inputSum - outputSum);
+        txPool.put(ByteBuffer.wrap(txHash), wrapped);
 
         // Broadcast transaction to nodes
         NetworkUtils.broadcastAsync(Config.PORT_TX_BROADCAST_OUT, tx.toBytes(), Config.PORT_TX_BROADCAST_IN);
 
-        // TODO: send new tx in pool (txHash/tx) to miners
+        // send new tx in pool (txHash/tx) to miners
+        NetworkUtils.broadcastAsync(Config.PORT_MSG_OUT, wrapped.toMsg(), Config.PORT_MSG_IN);
 
         /*
             For each orphan transaction that uses this one as one of its inputs,
@@ -235,7 +238,8 @@ public class VerifyUtils {
         if (prevBlock == null) {
             // orphan block, add this to orphan blocks
             orphanBlocks.put(ByteBuffer.wrap(headerHash), block);
-            // TODO: then query peer we got this from for orphan's parent;
+            // then query peer we got this from for orphan's parent
+            NetworkUtils.sendPacketAsync(fromPeer, Config.PORT_MSG_OUT, MsgUtils.toBlockRequestMsg(headerHash), Config.PORT_MSG_IN);
         } else {
             // if prevBlock already has a son, we reject this block completely (no multi-branch implementation for simplicity reasons)
             if (!blockchainService.isSonPresentForParentBlock(prevBlock.hashHeader())) {
@@ -305,8 +309,18 @@ public class VerifyUtils {
                     return false;
                 }
                 // For each transaction in the block, delete any matching transaction from the transaction pool
-                txs.forEach(tx -> txPool.remove(ByteBuffer.wrap(tx.hashTransaction())));
-                // TODO: send updated tx pool to miners (which txs are no longer in pool)
+                List<byte[]> removedTxHashes = new ArrayList<>();
+                txs.forEach(new Consumer<Transaction>() {
+                    @Override
+                    public void accept(Transaction tx) {
+                        WrappedTransaction removed = txPool.remove(ByteBuffer.wrap(tx.hashTransaction()));
+                        if (removed != null) {
+                            removedTxHashes.add(removed.getTx().hashTransaction());
+                        }
+                    }
+                });
+                // send updated tx pool to miners (which txs are no longer in pool)
+                NetworkUtils.broadcastAsync(Config.PORT_MSG_OUT, MsgUtils.toRemoveMsg(removedTxHashes), Config.PORT_MSG_IN);
 
                 // Add to chain
                 blockchainService.addBlockToChain(block);

@@ -12,6 +12,8 @@ public interface Config {
     int PORT_BLOCK_BROADCAST_OUT = 10243;
     int PORT_MSG_IN = 10244;
     int PORT_MSG_OUT = 10245;
+    int PORT_LOCAL_HALT_IN = 10246;
+    int PORT_LOCAL_HALT_OUT = 10247;
     int COINBASE_MATURITY = 10;
     int MAX_BLOCK_SIZE = 32768;
     // 5 btc

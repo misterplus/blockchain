@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -87,9 +88,9 @@ public class MinerImpl implements Miner {
 
     @Override
     public void initLocalPool() {
-        List<WrappedTransaction> list = ByteUtils.fromBytes(HttpRequest.post(urlInitLocalPool)
+        List<WrappedTransaction> list = ByteUtils.fromJson(HttpRequest.post(urlInitLocalPool)
                 .timeout(5000)
-                .execute().body().getBytes(), new ArrayList<>());
+                .execute().body(), new ArrayList<>());
         this.localTxPool.addAll(list);
     }
 
@@ -97,7 +98,7 @@ public class MinerImpl implements Miner {
     public boolean fillBlock(Block newBlock) {
         boolean blockFull = false;
         long extraFee = 0L;
-        // TODO: if you want to update local pool, do it now
+        digestMsgs();
         // keep adding txs until block is full or local pool is empty
         while(newBlock.toBytes().length <= Config.MAX_BLOCK_SIZE && !localTxPool.isEmpty()) {
             // get the most valuable one, but don't remove it from the queue
@@ -127,8 +128,20 @@ public class MinerImpl implements Miner {
     public void digestMsgs() {
         Queue<byte[]> msgs = this.msgThread.msgs;
         while (!msgs.isEmpty()) {
-            byte[] msg = msgs.poll();
+            byte[] multiPart = msgs.poll();
             // add or remove shit
+            byte[] msg = Arrays.copyOfRange(multiPart, 1, multiPart.length);
+            if (MsgUtils.isMsgAdd(msg)) {
+                List<WrappedTransaction> toAdd = ByteUtils.fromBytes(msg, new ArrayList<>());
+                this.localTxPool.addAll(toAdd);
+            } else if (MsgUtils.isMsgRemove(msg)) {
+                // better implementation possibly?
+                List<Object> toRemove = ByteUtils.fromBytes(msg, new ArrayList<>());
+                if (toRemove != null) {
+                    toRemove.replaceAll(o -> ByteBuffer.wrap((byte[]) o));
+                    this.localTxPool.removeIf(wrappedTx -> toRemove.contains(ByteBuffer.wrap(wrappedTx.getTx().hashTransaction())));
+                }
+            }
         }
     }
 
@@ -162,7 +175,9 @@ public class MinerImpl implements Miner {
                     if (isRemove) {
                         beaten = true;
                     }
-                    msgs.add(data);
+                    if (MsgUtils.isPoolMsg(data)) {
+                        msgs.add(data);
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -206,19 +221,20 @@ public class MinerImpl implements Miner {
                 NetworkUtils.sendPacket(miner.node, Config.PORT_BLOCK_BROADCAST_OUT, newBlock.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
                 // wait for reply
                 DatagramSocket socket = new DatagramSocket(Config.PORT_MSG_IN);
-                byte[] data;
+                byte[] data = new byte[]{0};
                 DatagramPacket packet;
-                data = new byte[32768];
-                packet = new DatagramPacket(data, data.length);
-                socket.receive(packet);
-                boolean accepted = MsgUtils.isBlockAccepted(data);
-                if (accepted) {
-                    // block solved by us and accepted by node
-                    System.out.printf("[MSG]Block with hash %s is accepted!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
-                } else {
-                    // block solved by us but rejected by node, revert local pool, as if we did not solve this block
-                    miner.localTxPool.addAll(miner.revertList);
-                    System.out.printf("[MSG]Block with hash %s is rejected!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
+                while (!MsgUtils.isBlockMsg(data)) {
+                    data = new byte[32768];
+                    packet = new DatagramPacket(data, data.length);
+                    socket.receive(packet);
+                    if (MsgUtils.isBlockAccepted(data)) {
+                        // block solved by us and accepted by node
+                        System.out.printf("[MSG]Block with hash %s is accepted!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
+                    } else if (MsgUtils.isBlockRejected(data)) {
+                        // block solved by us but rejected by node, revert local pool, as if we did not solve this block
+                        miner.localTxPool.addAll(miner.revertList);
+                        System.out.printf("[MSG]Block with hash %s is rejected!\n", Hex.encodeHexString(newBlock.hashHeader(), false));
+                    }
                 }
             } else {
                 // block solved by others, revert local pool, as if we did not solve this block

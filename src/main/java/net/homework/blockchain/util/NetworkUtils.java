@@ -28,4 +28,10 @@ public class NetworkUtils {
             e.printStackTrace();
         }
     }
+
+    public static void sendPacketAsync(InetAddress address, int portOut, byte[] data, int portIn) {
+        new Thread(() -> {
+            sendPacket(address, portOut, data, portIn);
+        }).start();
+    }
 }

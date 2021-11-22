@@ -148,13 +148,19 @@ public class BlockchainService {
             genesis.getHeader().setTime(1637148832393L);
             addBlockToChain(genesis);
         }
-        testMethod();
+    }
+
+    @PostConstruct
+    public void startNode() {
+        new Thread(() -> {
+            NodeImpl.main(new String[]{});
+        }).start();
     }
 
     @Deprecated
     public void testMethod() {
         Transaction tx = getBlockOnChainByHeight(1L).getTransactions().get(0);
-        NodeImpl.TX_POOL.put(ByteBuffer.wrap(tx.hashTransaction()), new WrappedTransaction(tx, 5L));
+        NodeImpl.TX_POOL.put(ByteBuffer.wrap(tx.hashTransaction()), WrappedTransaction.wrap(tx, 5L));
     }
 
     public long getCurrentBlockHeight() {
