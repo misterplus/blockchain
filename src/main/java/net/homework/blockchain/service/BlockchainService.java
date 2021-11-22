@@ -157,7 +157,7 @@ public class BlockchainService {
     @PostConstruct
     public void startNode() {
         node = new Thread(() -> {
-            synchronized(this) {
+            synchronized (this) {
                 Node node = new NodeImpl();
                 node.init();
                 try {

@@ -24,13 +24,12 @@ public class MinerImpl implements Miner {
 
     private final PriorityQueue<WrappedTransaction> localTxPool = new PriorityQueue<>();
     private final List<WrappedTransaction> revertList = new ArrayList<>();
+    private final MessageThread msgThread = new MessageThread();
     private InetAddress node;
-    private String address;
     private byte[] publicKeyHash;
     private String urlLatestHash;
     private String urlTotalInput;
     private String urlInitLocalPool;
-    private final MessageThread msgThread = new MessageThread();
 
 
     private MinerImpl() {
@@ -207,7 +206,6 @@ public class MinerImpl implements Miner {
         this.urlTotalInput = String.format("%s:%d/totalInput", args[0], Config.PORT_HTTP);
         this.urlInitLocalPool = String.format("%s:%d/txPool", args[0], Config.PORT_HTTP);
         this.node = InetAddress.getByName(args[0]);
-        this.address = args[1];
         this.publicKeyHash = CryptoUtils.getPublicKeyHashFromAddress(args[1]);
         this.initLocalPool();
         this.msgThread.start();

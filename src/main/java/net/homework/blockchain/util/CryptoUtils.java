@@ -16,10 +16,10 @@ import java.security.*;
 import java.util.Arrays;
 
 public class CryptoUtils {
+    private static final ECParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec("secp256k1");
     private static MessageDigest sha256;
     private static MessageDigest ripemd160;
     private static KeyFactory keyFactory;
-    private static final ECParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec("secp256k1");
     private static Signature signer;
 
     static {

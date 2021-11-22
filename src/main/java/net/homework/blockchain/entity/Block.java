@@ -31,6 +31,7 @@ public class Block {
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderColumn(name = "index_in_block")
     private List<Transaction> transactions;
+
     public Block(byte[] hashPrevBlock, List<Transaction> transactions) {
         ArrayList<byte[]> tree = new ArrayList<>();
         for (Transaction tx : transactions) {

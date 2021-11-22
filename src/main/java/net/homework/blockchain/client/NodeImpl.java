@@ -13,7 +13,10 @@ import net.homework.blockchain.util.VerifyUtils;
 import org.apache.commons.codec.binary.Hex;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.nio.ByteBuffer;
 import java.util.*;
 
