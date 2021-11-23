@@ -1,13 +1,11 @@
 package net.homework.blockchain.util;
 
-import net.homework.blockchain.Config;
-
 import java.io.IOException;
 import java.net.*;
 
 public class NetworkUtils {
-    public synchronized static void sendPacket(DatagramSocket socket, byte[] data, InetAddress address) {
-        DatagramPacket packet = new DatagramPacket(data, 0, data.length, address, Config.PORT_IN);
+    public synchronized static void sendPacket(DatagramSocket socket, byte[] data, InetAddress address, int port) {
+        DatagramPacket packet = new DatagramPacket(data, 0, data.length, address, port);
         try {
             socket.send(packet);
         } catch (IOException e) {
@@ -15,9 +13,9 @@ public class NetworkUtils {
         }
     }
 
-    public synchronized static void broadcast(DatagramSocket socket, byte[] data) {
+    public synchronized static void broadcast(DatagramSocket socket, byte[] data, int port) {
         try {
-            DatagramPacket packet = new DatagramPacket(data, 0, data.length, InetAddress.getByName("255.255.255.255"), Config.PORT_IN);
+            DatagramPacket packet = new DatagramPacket(data, 0, data.length, InetAddress.getByName("255.255.255.255"), port);
             socket.setBroadcast(true);
             socket.send(packet);
             socket.setBroadcast(false);

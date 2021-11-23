@@ -24,7 +24,7 @@ public class MinerImpl implements Miner {
 
     private final PriorityQueue<WrappedTransaction> localTxPool = new PriorityQueue<>();
     private final List<WrappedTransaction> revertList = new ArrayList<>();
-    private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_OUT);
+    private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_MINER_OUT);
     private final MessageThread msgThread = new MessageThread();
     private InetAddress node;
     private byte[] publicKeyHash;
@@ -70,7 +70,7 @@ public class MinerImpl implements Miner {
             } else {
                 LOGGER.info(String.format("Block with hash %s is solved with nonce %d, submitting...", block.hashHeaderHex(), block.getHeader().getNonce()));
                 // block solved by us, submit to node
-                NetworkUtils.sendPacket(miner.socketOut, block.toMsg(), miner.node);
+                NetworkUtils.sendPacket(miner.socketOut, block.toMsg(), miner.node, Config.PORT_NODE_IN);
                 // wait for reply
                 synchronized (miner.msgThread.blockMsgs) {
                     LOGGER.debug("Waiting for block message...");
@@ -207,7 +207,7 @@ public class MinerImpl implements Miner {
         // remove: txs to remove from the current local pool, which means another block was submitted and accepted, stop hashing the current block and discard it
         private final Queue<byte[]> poolMsgs = new LinkedList<>();
         private final Queue<byte[]> blockMsgs = new LinkedList<>();
-        private final DatagramSocket socketIn = new DatagramSocket(Config.PORT_IN);
+        private final DatagramSocket socketIn = new DatagramSocket(Config.PORT_MINER_IN);
         private boolean beaten = false;
 
         private MessageThread() throws SocketException {

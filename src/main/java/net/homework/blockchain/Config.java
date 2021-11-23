@@ -14,7 +14,15 @@ public interface Config {
     // web port
     int PORT_HTTP = 8080;
 
-    // udp port
-    int PORT_IN = 10240;
-    int PORT_OUT = 10241;
+    // node port
+    int PORT_NODE_IN = 10240;
+    int PORT_NODE_OUT = 10241;
+
+    // miner port
+    int PORT_MINER_IN = 10242;
+    int PORT_MINER_OUT = 10243;
+
+    // user port
+    int PORT_USER_IN = 10244;
+    int PORT_USER_OUT = 10245;
 }

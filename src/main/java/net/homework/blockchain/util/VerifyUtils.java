@@ -172,11 +172,11 @@ public class VerifyUtils {
         WrappedTransaction wrapped = WrappedTransaction.wrap(tx, inputSum - outputSum);
         txPool.put(ByteBuffer.wrap(txHash), wrapped);
 
-        // Broadcast transaction to nodes
-        NetworkUtils.broadcast(socketOut, tx.toMsg());
+        // Broadcast transaction to our peers
+        //NetworkUtils.broadcast(socketOut, tx.toMsg(), Config.PORT_NODE_IN);
 
         // send new tx in pool (txHash/tx) to miners
-        NetworkUtils.broadcast(socketOut, wrapped.toMsg());
+        NetworkUtils.broadcast(socketOut, wrapped.toMsg(), Config.PORT_MINER_IN);
 
         /*
             For each orphan transaction that uses this one as one of its inputs,
@@ -247,7 +247,7 @@ public class VerifyUtils {
             // orphan block, add this to orphan blocks
             orphanBlocks.put(ByteBuffer.wrap(headerHash), block);
             // then query peer we got this from for orphan's parent
-            NetworkUtils.sendPacket(socketOut, MsgUtils.toBlockRequestMsg(headerHash), fromPeer);
+            NetworkUtils.sendPacket(socketOut, MsgUtils.toBlockRequestMsg(headerHash), fromPeer, Config.PORT_NODE_IN);
         } else {
             // if prevBlock already has a son, we reject this block completely (no multi-branch implementation for simplicity reasons)
             if (!blockchainService.isSonPresentForParentBlock(prevBlock.hashHeader())) {
@@ -325,12 +325,12 @@ public class VerifyUtils {
                     }
                 });
                 // send updated tx pool to miners (which txs are no longer in pool)
-                NetworkUtils.broadcast(socketOut, MsgUtils.toRemoveMsg(removedTxHashes));
+                NetworkUtils.broadcast(socketOut, MsgUtils.toRemoveMsg(removedTxHashes), Config.PORT_MINER_IN);
 
                 // Add to chain
                 blockchainService.addBlockToChain(block);
                 // Broadcast block to our peers
-                NetworkUtils.broadcast(socketOut, block.toMsg());
+                //NetworkUtils.broadcast(socketOut, block.toMsg(), Config.PORT_NODE_IN);
 
                 // For each orphan block for which this block is its prev, run all these steps (including this one) recursively on that orphan
                 orphanBlocks.values().forEach(orphanBlock -> {
