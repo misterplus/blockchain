@@ -123,21 +123,24 @@ public class MinerImpl implements Miner {
     }
 
     @Override
-    public boolean fillBlock(Block newBlock) {
+    public boolean fillBlock(Block block) {
         boolean blockFull = false;
         long extraFee = 0L;
         digestPoolMsgs();
+        LOGGER.debug(String.format("Filling block with hash %s...", block.hashHeaderHex()));
         // keep adding txs until block is full or local pool is empty
-        while (newBlock.toBytes().length <= Config.MAX_BLOCK_SIZE && !localTxPool.isEmpty()) {
+        while (block.toBytes().length <= Config.MAX_BLOCK_SIZE && !localTxPool.isEmpty()) {
             // get the most valuable one, but don't remove it from the queue
             WrappedTransaction wrappedTx = localTxPool.element();
             Transaction toAdd = wrappedTx.getTx();
             // try adding it
-            newBlock.addTransaction(toAdd);
+            block.addTransaction(toAdd);
+            LOGGER.debug(String.format("Adding transaction with hash %s to block...", toAdd.hashTransactionHex()));
             // if it doesn't fit, revert
-            if (newBlock.toBytes().length > Config.MAX_BLOCK_SIZE) {
-                newBlock.revert();
+            if (block.toBytes().length > Config.MAX_BLOCK_SIZE) {
+                Transaction reverted = block.revert();
                 blockFull = true;
+                LOGGER.debug(String.format("Block size exceeded limit, reverting last addition of transaction %s....", reverted.hashTransactionHex()));
                 // in theory we can add smaller transactions, but halting is simpler (we are using queue)
                 break;
             }
@@ -148,7 +151,7 @@ public class MinerImpl implements Miner {
             }
         }
         // block finished, update miner fee
-        updateReward(newBlock, extraFee);
+        updateReward(block, extraFee);
         return blockFull;
     }
 

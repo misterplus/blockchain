@@ -54,9 +54,9 @@ public class Block implements IMessage {
         this.header.addTransaction(tx);
     }
 
-    public void revert() {
-        this.transactions.remove(this.transactions.size() - 1);
+    public Transaction revert() {
         this.header.revert();
+        return this.transactions.remove(this.transactions.size() - 1);
     }
 
     /**
