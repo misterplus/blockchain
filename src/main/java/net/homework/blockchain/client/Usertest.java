@@ -43,13 +43,13 @@ public class Usertest {
         //System.out.println(Hex.encodeHex(b1, false));
         //System.out.println(Base58.encode(Hex.decodeHex(Hex.encodeHex(b1,false))));
         char[] localPriKey = Hex.encodeHex(b0, false);
-        FileWriter prifw = new FileWriter("../privateKey.key");
+        FileWriter prifw = new FileWriter("./privateKey.key");
         BufferedWriter pribw = new BufferedWriter(prifw);
         pribw.write(String.valueOf(localPriKey));
         pribw.flush();
         pribw.close();
         prifw.close();
-        FileReader prifr = new FileReader("../privateKey.key");
+        FileReader prifr = new FileReader("./privateKey.key");
         BufferedReader pribr = new BufferedReader(prifr);
         byte[] LocalKeyByte =Hex.decodeHex(pribr.readLine());
         System.out.println("Localread"+LocalKeyByte);

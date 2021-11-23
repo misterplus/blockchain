@@ -3,7 +3,7 @@ package net.homework.blockchain.client;
 import com.fasterxml.jackson.databind.util.JSONPObject;
 import io.leonard.Base58;
 import lombok.SneakyThrows;
-import net.homework.blockchain.bean.Transaction;
+import net.homework.blockchain.entity.Transaction;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;

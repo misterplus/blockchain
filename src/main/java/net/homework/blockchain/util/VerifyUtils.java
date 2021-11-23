@@ -4,8 +4,10 @@ import net.homework.blockchain.Config;
 import net.homework.blockchain.SpringContext;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
+import net.homework.blockchain.entity.WrappedTransaction;
 import net.homework.blockchain.service.BlockchainService;
 
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -26,6 +28,10 @@ public class VerifyUtils {
         } else {
             return false;
         }
+    }
+
+    public static boolean isCoinbasePointedToLastBlock(Transaction tx, byte[] hashPrevBlock) {
+        return Arrays.equals(tx.getInputs().get(0).getScriptSig(), hashPrevBlock);
     }
 
     public static boolean isCoinbaseInput(Transaction.Input input) {
@@ -73,7 +79,7 @@ public class VerifyUtils {
         return outputSum;
     }
 
-    public static boolean verifyTx(Transaction tx, Map<ByteBuffer, Transaction> txPool, Map<ByteBuffer, Transaction> orphanTxs) {
+    public static synchronized boolean verifyTx(Transaction tx, Map<ByteBuffer, WrappedTransaction> txPool, Map<ByteBuffer, Transaction> orphanTxs, DatagramSocket socketOut) {
         // Check syntactic correctness
         if (tx == null) {
             return false;
@@ -106,7 +112,8 @@ public class VerifyUtils {
             refOut = input.getPreviousTransactionHash();
             outIndex = input.getOutIndex();
             refOutTx = null;
-            for (Transaction txInPool : txPool.values()) {
+            for (WrappedTransaction wrappedTxInPool : txPool.values()) {
+                Transaction txInPool = wrappedTxInPool.getTx();
                 for (Transaction.Input inputInPool : txInPool.getInputs()) {
                     // if the referenced output is spent by any other transaction in the pool, reject this transaction.
                     if (Arrays.equals(inputInPool.getPreviousTransactionHash(), refOut) && inputInPool.getOutIndex() == outIndex) {
@@ -131,7 +138,7 @@ public class VerifyUtils {
                 return true;
             } else {
                 // if the referenced output is coinbase, it must be matured, or we reject it
-                if (isCoinbaseTx(refOutTx) && !blockchainService.isCoinbaseTxMature(refOutTx.hashTransaction())) {
+                if (isCoinbaseTx(refOutTx) && blockchainService.isCoinbaseTxImmature(refOutTx.hashTransaction())) {
                     return false;
                 }
                 // if the referenced output is spent on chain, reject it
@@ -162,12 +169,14 @@ public class VerifyUtils {
         }
 
         // Add to transaction pool
-        txPool.put(ByteBuffer.wrap(txHash), tx);
+        WrappedTransaction wrapped = WrappedTransaction.wrap(tx, inputSum - outputSum);
+        txPool.put(ByteBuffer.wrap(txHash), wrapped);
 
         // Broadcast transaction to nodes
-        NetworkUtils.broadcast(Config.PORT_TX_BROADCAST_OUT, tx.toBytes(), Config.PORT_TX_BROADCAST_IN);
+        NetworkUtils.broadcast(socketOut, tx.toMsg());
 
-        // TODO: send new tx in pool (txHash/tx) to miners
+        // send new tx in pool (txHash/tx) to miners
+        NetworkUtils.broadcast(socketOut, wrapped.toMsg());
 
         /*
             For each orphan transaction that uses this one as one of its inputs,
@@ -175,7 +184,7 @@ public class VerifyUtils {
          */
         for (Transaction orphan : orphanTxs.values()) {
             if (orphan.getInputs().stream().anyMatch(input -> isTxSpentByInput(tx, input))) {
-                verifyTx(orphan, txPool, orphanTxs);
+                verifyTx(orphan, txPool, orphanTxs, socketOut);
             }
         }
         return true;
@@ -185,7 +194,7 @@ public class VerifyUtils {
         return Arrays.equals(input.getPreviousTransactionHash(), tx.hashTransaction()) && tx.getOutputs().size() > input.getOutIndex();
     }
 
-    public static boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, Transaction> txPool) {
+    public static synchronized boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, WrappedTransaction> txPool, DatagramSocket socketOut) {
         // Check syntactic correctness
         if (block == null) {
             return false;
@@ -209,6 +218,10 @@ public class VerifyUtils {
         if (!isCoinbaseTx(txs.get(0))) {
             return false;
         }
+        // coinbase tx's scriptSig must point to hashPrevBlock (to preserve unique hash)
+        if (!isCoinbasePointedToLastBlock(txs.get(0), header.getHashPrevBlock())) {
+            return false;
+        }
         if (txs.subList(1, txs.size()).stream().anyMatch(VerifyUtils::isCoinbaseTx)) {
             return false;
         }
@@ -225,7 +238,7 @@ public class VerifyUtils {
         byte[] merkleHash = header.getHashMerkleRoot();
         block.reconstructMerkleTree();
         byte[] calculatedMerkleHash = header.getMerkleTree().hashMerkleTree();
-        if (merkleHash != calculatedMerkleHash) {
+        if (!Arrays.equals(merkleHash, calculatedMerkleHash)) {
             return false;
         }
         // Check if prev block is on-chain.
@@ -233,7 +246,8 @@ public class VerifyUtils {
         if (prevBlock == null) {
             // orphan block, add this to orphan blocks
             orphanBlocks.put(ByteBuffer.wrap(headerHash), block);
-            // TODO: then query peer we got this from for orphan's parent;
+            // then query peer we got this from for orphan's parent
+            NetworkUtils.sendPacket(socketOut, MsgUtils.toBlockRequestMsg(headerHash), fromPeer);
         } else {
             // if prevBlock already has a son, we reject this block completely (no multi-branch implementation for simplicity reasons)
             if (!blockchainService.isSonPresentForParentBlock(prevBlock.hashHeader())) {
@@ -262,7 +276,7 @@ public class VerifyUtils {
                                 (refOutTx.getOutputs().size() <= outIndex) ||
                                 // if the referenced output transaction is coinbase (i.e. only 1 input, with hash=0, n=-1),
                                 // it must have at least COINBASE_MATURITY (10) confirmations; else reject.
-                                (isCoinbaseTx(refOutTx) && !blockchainService.isCoinbaseTxMature(refOutTx.hashTransaction())) ||
+                                (isCoinbaseTx(refOutTx) && blockchainService.isCoinbaseTxImmature(refOutTx.hashTransaction())) ||
                                 // Verify crypto signatures for each input; reject if any are bad
                                 (!verifyInput(input)) ||
                                 // if the referenced output is spent on chain, reject it
@@ -303,19 +317,26 @@ public class VerifyUtils {
                     return false;
                 }
                 // For each transaction in the block, delete any matching transaction from the transaction pool
-                txs.forEach(tx -> txPool.remove(ByteBuffer.wrap(tx.hashTransaction())));
-                // TODO: send updated tx pool to miners (which txs are no longer in pool)
+                List<byte[]> removedTxHashes = new ArrayList<>();
+                txs.forEach(tx -> {
+                    WrappedTransaction removed = txPool.remove(ByteBuffer.wrap(tx.hashTransaction()));
+                    if (removed != null) {
+                        removedTxHashes.add(removed.getTx().hashTransaction());
+                    }
+                });
+                // send updated tx pool to miners (which txs are no longer in pool)
+                NetworkUtils.broadcast(socketOut, MsgUtils.toRemoveMsg(removedTxHashes));
 
                 // Add to chain
                 blockchainService.addBlockToChain(block);
                 // Broadcast block to our peers
-                NetworkUtils.broadcast(Config.PORT_BLOCK_BROADCAST_OUT, block.toBytes(), Config.PORT_BLOCK_BROADCAST_IN);
+                NetworkUtils.broadcast(socketOut, block.toMsg());
 
                 // For each orphan block for which this block is its prev, run all these steps (including this one) recursively on that orphan
                 orphanBlocks.values().forEach(orphanBlock -> {
                     if (Arrays.equals(headerHash, orphanBlock.getHeader().getHashPrevBlock())) {
                         try {
-                            verifyBlock(orphanBlock, InetAddress.getLocalHost(), orphanBlocks, txPool);
+                            verifyBlock(orphanBlock, InetAddress.getLocalHost(), orphanBlocks, txPool, socketOut);
                         } catch (UnknownHostException e) {
                             e.printStackTrace();
                         }

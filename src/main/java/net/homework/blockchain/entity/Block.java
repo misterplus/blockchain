@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import net.homework.blockchain.Config;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
+import net.homework.blockchain.util.MsgUtils;
+import org.apache.commons.codec.binary.Hex;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -18,22 +20,15 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-public class Block {
+public class Block implements IMessage {
 
     @JsonIgnore
     private byte[] hashBlock;
-
-    @PrePersist
-    public void preSave() {
-        this.hashBlock = hashHeader();
-    }
-
     @JsonIgnore
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     // block height
     private long height;
-
     private Header header;
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderColumn(name = "index_in_block")
@@ -49,9 +44,19 @@ public class Block {
         this.transactions = transactions;
     }
 
+    @PrePersist
+    public void preSave() {
+        this.hashBlock = hashHeader();
+    }
+
     public void addTransaction(Transaction tx) {
         this.transactions.add(tx);
-        this.header.addHash(tx);
+        this.header.addTransaction(tx);
+    }
+
+    public Transaction revert() {
+        this.header.revert();
+        return this.transactions.remove(this.transactions.size() - 1);
     }
 
     /**
@@ -66,6 +71,12 @@ public class Block {
         this.header.merkleTree = new MerkleTree(tree);
     }
 
+    @Override
+    public byte msgType() {
+        return MsgUtils.BLOCK_NEW;
+    }
+
+    @Override
     public byte[] toBytes() {
         return ByteUtils.toBytes(this);
     }
@@ -85,6 +96,10 @@ public class Block {
             transactions.get(0).getInputs().get(0).incrementExtraNonce();
         }
         this.header.time = System.currentTimeMillis();
+    }
+
+    public String hashHeaderHex() {
+        return Hex.encodeHexString(hashHeader(), false);
     }
 
     @Data
@@ -108,11 +123,6 @@ public class Block {
         @JsonIgnore
         private transient MerkleTree merkleTree;
 
-        @Transient // do not store in db
-        public MerkleTree getMerkleTree() {
-            return merkleTree;
-        }
-
         public Header(byte[] hashPrevBlock, MerkleTree merkleTree) {
             this.hashPrevBlock = hashPrevBlock;
             this.merkleTree = merkleTree;
@@ -120,25 +130,27 @@ public class Block {
             this.time = System.currentTimeMillis();
         }
 
-        public void updateMerkleRoot(byte[] newRoot) {
-            this.hashMerkleRoot = newRoot;
+        @Transient // do not store in db
+        public MerkleTree getMerkleTree() {
+            return merkleTree;
         }
 
-        public void addHash(Transaction tx) {
-            this.merkleTree.addHash(tx);
-            this.updateMerkleRoot(this.merkleTree.hashMerkleTree());
+        private void updateMerkleRoot() {
+            this.hashMerkleRoot = this.merkleTree.hashMerkleTree();
+        }
+
+        public void addTransaction(Transaction tx) {
+            this.merkleTree.addTransaction(tx);
+            this.updateMerkleRoot();
+        }
+
+        public void revert() {
+            this.merkleTree.revert();
+            this.updateMerkleRoot();
         }
 
         private byte[] hashHeader() {
             return CryptoUtils.sha256Twice(ByteUtils.toBytes(this));
         }
     }
-
-    /*
-      Mining:
-       construct a new block, add txs
-       while block is not valid
-           increment()
-       send to node
-     */
 }

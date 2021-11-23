@@ -1,14 +1,20 @@
 package net.homework.blockchain.controller;
 
+import net.homework.blockchain.client.NodeImpl;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
 import net.homework.blockchain.service.BlockchainService;
+import net.homework.blockchain.util.ByteUtils;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/")
@@ -57,5 +63,32 @@ public class BlockchainController {
         } catch (DecoderException e) {
             return -1;
         }
+    }
+
+    @RequestMapping("latestBlockHash")
+    public String getLatestBlockHash() {
+        return Hex.encodeHexString(blockchainService.getLatestBlockHash(), false);
+    }
+
+    @RequestMapping("wallet/utxo")
+    public Map<String, String> getUTXOs(@RequestParam String publicKey) {
+        try {
+            Map<ByteBuffer, List<Integer>> utxos = blockchainService.getUTXOsNEW(Hex.decodeHex(publicKey));
+            Map<String, String> ret = new HashMap<>();
+            for (ByteBuffer key : utxos.keySet()) {
+                ret.put(Hex.encodeHexString(key.array(), false),
+                        utxos.get(key).stream()
+                                .map(Object::toString)
+                                .collect(Collectors.joining(",")));
+            }
+            return ret;
+        } catch (DecoderException e) {
+            return null;
+        }
+    }
+
+    @RequestMapping("txPool")
+    public String getTransactionPool() {
+        return ByteUtils.toJson(NodeImpl.TX_POOL.values());
     }
 }

@@ -20,6 +20,15 @@ public class ByteUtils {
         return null;
     }
 
+    public static <T> T fromJson(String json, T t) {
+        try {
+            return (T) MAPPER.readValue(json, t.getClass());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     public static String toJson(Object o) {
         try {
             return MAPPER.writeValueAsString(o);
