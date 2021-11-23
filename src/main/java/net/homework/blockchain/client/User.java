@@ -7,10 +7,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.spec.InvalidKeySpecException;
+import java.util.List;
 import java.util.Map;
 
 public interface User {
@@ -24,11 +26,11 @@ public interface User {
      * @param recipientsWithAmount publicKeyHash, value
      * @return
      */
-    Transaction assembleTx(Map<byte[], byte[]> recipientsWithAmount) throws DecoderException, IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException;
+    Transaction assembleTx(Map<byte[], Long> recipientsWithAmount) throws DecoderException, IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException;
     void broadcastTx(Transaction tx) throws IOException;
     /**
      * Get unspent transaction outputs.
      * @return transactionHash, outIndex
      */
-    Map<Transaction, Integer> getUTXOs();
+    Map<ByteBuffer, List<Integer>> getUTXOs();
 }

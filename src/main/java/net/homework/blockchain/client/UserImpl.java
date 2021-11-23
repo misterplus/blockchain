@@ -1,5 +1,6 @@
 package net.homework.blockchain.client;
 
+import com.fasterxml.jackson.databind.util.JSONPObject;
 import io.leonard.Base58;
 import lombok.SneakyThrows;
 import net.homework.blockchain.bean.Transaction;
@@ -14,6 +15,7 @@ import org.bouncycastle.math.ec.ECPoint;
 import java.io.*;
 import java.math.BigInteger;
 import java.net.*;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.interfaces.ECPrivateKey;
@@ -37,7 +39,7 @@ public class UserImpl implements User {
         // 0 - Private ECDSA Key
         byte[] b0 = removeLeadingZero(pri.getS().toByteArray());
         char[] localPriKey = Hex.encodeHex(b0, false);
-        FileWriter fileWriter = new FileWriter("E:/privateKey.key");
+        FileWriter fileWriter = new FileWriter("../privateKey.key");
         BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
         bufferedWriter.write(String.valueOf(localPriKey));
         bufferedWriter.flush();
@@ -72,19 +74,27 @@ public class UserImpl implements User {
         return Base58.encode(Hex.decodeHex(publicKey));
     }
     @Override
-    public Transaction assembleTx(Map<byte[], byte[]> recipientsWithAmount) throws DecoderException, IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException {
+    public Transaction assembleTx(Map<byte[], Long> recipientsWithAmount) throws DecoderException, IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException {
         BigInteger praviteKey = loadPrivateKey();
         char[] publicKey = getPublicKey(praviteKey);
         Transaction transaction = new Transaction();
-        Transaction.Input input = null ;
-        input.setPreviousTransactionHash(getPreviousTransactionHash());
-        input.setOutIndex(getOutIndex());
-        input.setScriptSig(signTransaction(getPreviousTransactionHash(),assemblePrivateKey(removeLeadingZero(praviteKey.toByteArray()))));
-        input.setScriptPubKey(Hex.decodeHex(publicKey));
+        int i=0;
         List<Transaction.Input> inputs = null;
-        inputs.add(input);
+        List<Transaction.Output> outputs = null;
+        //outputs.
+        for(i=0;i<recipientsWithAmount.size();i++){
+            Transaction.Input input = null ;
+            input.setPreviousTransactionHash(getPreviousTransactionHash());
+            input.setOutIndex(getOutIndex());
+            input.setScriptSig(signTransaction(getPreviousTransactionHash(),assemblePrivateKey(removeLeadingZero(praviteKey.toByteArray()))));
+            input.setScriptPubKey(Hex.decodeHex(publicKey));
+            inputs.add(input);
+            Transaction.Output output = null;
+            //output.setValue(recipientsWithAmount.);
+            //output.setScriptPubKeyHash(recipientsWithAmount.);
+        }
         transaction.setInputs(inputs);
-        return null;
+        return transaction;
     }
     @Override
     public void broadcastTx(Transaction tx) {
@@ -104,9 +114,16 @@ public class UserImpl implements User {
         }).start();
     }
     @Override
-    public Map<Transaction, Integer> getUTXOs() {
-
-        return null;
+    public Map<ByteBuffer, List<Integer>> getUTXOs() {
+        Map<ByteBuffer, List<Integer>> map = null;
+        List<Integer> outIndex = null;
+        try {
+            outIndex.set(0,0);
+            map.put(ByteBuffer.wrap("OEF31673217A8D528707EC44AE168182A8BE928178C5769EDD8DC427A4274990".getBytes("utf-8")),outIndex);
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        return map;
     }
     public byte[] getPreviousTransactionHash(){
         return null;
@@ -114,11 +131,4 @@ public class UserImpl implements User {
     public int getOutIndex(){
         return 0;
     }
-    public long getValue(){
-        return 0;
-    }
-    public byte[] getScriptPubKeyHash(){
-        return null;
-    }
-
 }
