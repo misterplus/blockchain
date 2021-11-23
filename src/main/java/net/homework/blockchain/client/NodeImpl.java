@@ -43,7 +43,7 @@ public class NodeImpl implements Node {
                     switch (data[0]) {
                         case MsgUtils.TX_NEW: {
                             Transaction tx = ByteUtils.fromBytes(Arrays.copyOfRange(data, 1, data.length), new Transaction());
-                            String hashString = tx == null ? "null" : Hex.encodeHexString(tx.hashTransaction(), false);
+                            String hashString = tx == null ? "null" : tx.hashTransactionHex();
                             LOGGER.info(String.format("Received transaction with hash %s from %s", hashString, packet.getAddress().toString()));
                             boolean accepted = false;
                             // Check that size in bytes >= 100
@@ -58,7 +58,7 @@ public class NodeImpl implements Node {
                         }
                         case MsgUtils.BLOCK_NEW: {
                             Block block = ByteUtils.fromBytes(Arrays.copyOfRange(data, 1, data.length), new Block());
-                            String hashString = block == null ? "null" : Hex.encodeHexString(block.hashHeader(), false);
+                            String hashString = block == null ? "null" : block.hashHeaderHex();
                             LOGGER.info(String.format("Received block with hash %s from %s", hashString, packet.getAddress().toString()));
                             boolean accepted = VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL, socketOut);
                             NetworkUtils.sendPacket(socketOut, MsgUtils.toBlockMsg(accepted), packet.getAddress());
@@ -104,6 +104,7 @@ public class NodeImpl implements Node {
         private final DatagramSocket socketIn = new DatagramSocket(Config.PORT_IN);
 
         public ListeningThread() throws SocketException {
+            super("NodeListeningThread");
         }
 
         public abstract void digest(byte[] data, DatagramPacket packet);

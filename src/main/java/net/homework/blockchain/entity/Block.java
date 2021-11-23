@@ -8,6 +8,7 @@ import net.homework.blockchain.Config;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
 import net.homework.blockchain.util.MsgUtils;
+import org.apache.commons.codec.binary.Hex;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -95,6 +96,10 @@ public class Block implements IMessage {
             transactions.get(0).getInputs().get(0).incrementExtraNonce();
         }
         this.header.time = System.currentTimeMillis();
+    }
+
+    public String hashHeaderHex() {
+        return Hex.encodeHexString(hashHeader(), false);
     }
 
     @Data

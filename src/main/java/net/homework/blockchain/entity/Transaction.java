@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
 import net.homework.blockchain.util.MsgUtils;
+import org.apache.commons.codec.binary.Hex;
 
 import javax.persistence.*;
 import java.util.List;
@@ -55,6 +56,10 @@ public class Transaction implements IMessage {
     @Override
     public byte[] toBytes() {
         return ByteUtils.toBytes(this);
+    }
+
+    public String hashTransactionHex() {
+        return Hex.encodeHexString(hashTransaction(), false);
     }
 
     @Data
