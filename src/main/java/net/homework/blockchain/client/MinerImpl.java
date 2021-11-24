@@ -205,8 +205,8 @@ public class MinerImpl implements Miner {
         private final Queue<byte[]> poolMsgs = new LinkedList<>();
         private final Queue<byte[]> blockMsgs = new LinkedList<>();
         private final DatagramSocket socketIn = new DatagramSocket(Config.PORT_MINER_IN);
-        private boolean beaten = false;
         private final InetAddress node;
+        private boolean beaten = false;
 
         private MessageThread(InetAddress node) throws SocketException {
             super("MinerMessageThread");

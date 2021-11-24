@@ -6,14 +6,11 @@ import net.homework.blockchain.client.Node;
 import net.homework.blockchain.client.NodeImpl;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
-import net.homework.blockchain.entity.WrappedTransaction;
 import net.homework.blockchain.repo.BlockRepository;
 import net.homework.blockchain.repo.InputRepository;
 import net.homework.blockchain.repo.OutputRepository;
 import net.homework.blockchain.repo.TransactionRepository;
 import net.homework.blockchain.util.CryptoUtils;
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -190,25 +187,5 @@ public class BlockchainService {
 
     public byte[] getLatestBlockHash() {
         return blockRepository.findById(getCurrentBlockHeight()).get().getHashBlock();
-    }
-
-    public long getTotalInput(Map<String, List<Integer>> map) {
-        try {
-            long inputSum = 0L;
-            for (String key : map.keySet()) {
-                Optional<Transaction> opTx = transactionRepository.findTransactionByHashTx(Hex.decodeHex(key));
-                if (opTx.isPresent()) {
-                    Transaction tx = opTx.get();
-                    List<Transaction.Output> outputs = tx.getOutputs();
-                    List<Integer> indexes = map.get(key);
-                    for (int index : indexes) {
-                        inputSum += outputs.get(index).getValue();
-                    }
-                }
-            }
-            return inputSum;
-        } catch (DecoderException e) {
-            return -1L;
-        }
     }
 }

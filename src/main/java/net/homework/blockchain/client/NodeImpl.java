@@ -13,13 +13,14 @@ import net.homework.blockchain.util.VerifyUtils;
 import org.apache.commons.codec.binary.Hex;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.*;
 
 public class NodeImpl implements Node {
-
-    private static final BlockchainService blockchainService = SpringContext.getBean(BlockchainService.class);
 
     // valid txs, to be processed by a miner
     public static final Map<ByteBuffer, WrappedTransaction> TX_POOL = new HashMap<>();
@@ -27,10 +28,10 @@ public class NodeImpl implements Node {
     public static final Map<ByteBuffer, Transaction> ORPHAN_TXS = new HashMap<>();
     // orphan blocks
     public static final Map<ByteBuffer, Block> ORPHAN_BLOCKS = new HashMap<>();
-
-    private ListeningThread listeningThread;
-    private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_NODE_OUT);
+    private static final BlockchainService blockchainService = SpringContext.getBean(BlockchainService.class);
     private static final Set<InetAddress> PEERS = new HashSet<>();
+    private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_NODE_OUT);
+    private ListeningThread listeningThread;
 
     public NodeImpl() throws SocketException {
     }
