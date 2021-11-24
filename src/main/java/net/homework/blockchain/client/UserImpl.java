@@ -25,6 +25,8 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import static net.homework.blockchain.util.NetworkUtils.*;
+import static net.homework.blockchain.Config.*;
 import static net.homework.blockchain.util.ByteUtils.removeLeadingZero;
 import static net.homework.blockchain.util.CryptoUtils.*;
 
@@ -78,36 +80,52 @@ public class UserImpl implements User {
         BigInteger praviteKey = loadPrivateKey();
         char[] publicKey = getPublicKey(praviteKey);
         Transaction transaction = new Transaction();
-        int i=0;
         List<Transaction.Input> inputs = null;
         List<Transaction.Output> outputs = null;
-        //outputs.
-        for(i=0;i<recipientsWithAmount.size();i++){
-            Transaction.Input input = null ;
-            input.setPreviousTransactionHash(getPreviousTransactionHash());
-            input.setOutIndex(getOutIndex());
-            input.setScriptSig(signTransaction(getPreviousTransactionHash(),assemblePrivateKey(removeLeadingZero(praviteKey.toByteArray()))));
-            input.setScriptPubKey(Hex.decodeHex(publicKey));
-            inputs.add(input);
+        Map<ByteBuffer,List<Integer>> byteBufferListMap = null;
+        for(Map.Entry<ByteBuffer,List<Integer>> entry:byteBufferListMap.entrySet()){
+            for (int i = 0; i < entry.getValue().size(); i++) {
+                Transaction.Input input = null;
+                entry.getKey().flip();
+                int length = entry.getKey().limit() - entry.getKey().position();
+                byte [] previousTransactionHash = new byte[length];
+                for (int j=0;j<previousTransactionHash.length;j++){
+                    previousTransactionHash[i]=entry.getKey().get();
+                }
+                input.setPreviousTransactionHash(previousTransactionHash);
+                input.setOutIndex(entry.getValue().get(i));
+                input.setScriptSig(signTransaction(getPreviousTransactionHash(), assemblePrivateKey(removeLeadingZero(praviteKey.toByteArray()))));
+                input.setScriptPubKey(Hex.decodeHex(publicKey));
+                inputs.add(input);
+            }
+        }
+        for(Map.Entry<byte[],Long> entry:recipientsWithAmount.entrySet()){
             Transaction.Output output = null;
-            //output.setValue(recipientsWithAmount.);
-            //output.setScriptPubKeyHash(recipientsWithAmount.);
+            output.setValue(entry.getValue());
+            output.setScriptPubKeyHash(entry.getKey());
+            outputs.add(output);
         }
         transaction.setInputs(inputs);
+        transaction.setOutputs(outputs);
         return transaction;
     }
     @Override
     public void broadcastTx(Transaction tx) {
         new Thread(() ->{
             try {
-                InetAddress address = InetAddress.getByName("localhost");
-                int port = 6666;
-                byte[] transactionHash = tx.getOutputs().get(0).getScriptPubKeyHash();
-                long outIndex = tx.getOutputs().get(0).getValue();
-                //我貌似没明白怎么同时传这两个数据，那就暂时先传tx的公钥哈希
-                DatagramPacket packet = new DatagramPacket(transactionHash, transactionHash.length, address, port);
-                DatagramSocket socket = new DatagramSocket();
-                socket.send(packet);
+                DatagramSocket portUserOut =new DatagramSocket(PORT_USER_OUT);
+                byte[] transactionHash = tx.getHashTx();
+                broadcast(portUserOut,transactionHash,PORT_NODE_IN);
+            }catch (IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
+        new Thread(() ->{
+            try {
+                DatagramSocket portUserIn =new DatagramSocket(PORT_USER_IN);
+                byte[] receive = new byte[1024];
+                DatagramPacket packet = new DatagramPacket(receive,receive.length);
+                portUserIn.receive(packet);
             }catch (IOException e) {
                 e.printStackTrace();
             }

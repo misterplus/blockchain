@@ -29,7 +29,7 @@ public class NodeImpl implements Node {
     public static final Map<ByteBuffer, Block> ORPHAN_BLOCKS = new HashMap<>();
 
     private ListeningThread listeningThread;
-    private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_OUT);
+    private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_NODE_OUT);
 
     public NodeImpl() throws SocketException {
     }
@@ -52,7 +52,7 @@ public class NodeImpl implements Node {
                                 accepted = VerifyUtils.verifyTx(tx, TX_POOL, ORPHAN_TXS, socketOut);
                             }
                             // send accepted msg back
-                            NetworkUtils.sendPacket(socketOut, MsgUtils.toTxMsg(accepted), packet.getAddress());
+                            NetworkUtils.sendPacket(socketOut, MsgUtils.toTxMsg(accepted), packet.getAddress(), Config.PORT_USER_IN);
                             LOGGER.info(String.format("%s transaction with hash %s from %s", accepted ? "Accepted" : "Rejected", hashString, packet.getAddress().toString()));
                             break;
                         }
@@ -61,7 +61,7 @@ public class NodeImpl implements Node {
                             String hashString = block == null ? "null" : block.hashHeaderHex();
                             LOGGER.info(String.format("Received block with hash %s from %s", hashString, packet.getAddress().toString()));
                             boolean accepted = VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL, socketOut);
-                            NetworkUtils.sendPacket(socketOut, MsgUtils.toBlockMsg(accepted), packet.getAddress());
+                            NetworkUtils.sendPacket(socketOut, MsgUtils.toBlockMsg(accepted), packet.getAddress(), Config.PORT_MINER_IN);
                             LOGGER.info(String.format("%s block with hash %s from %s", accepted ? "Accepted" : "Rejected", hashString, packet.getAddress().toString()));
                             break;
                         }
@@ -69,7 +69,7 @@ public class NodeImpl implements Node {
                             byte[] headerHash = Arrays.copyOfRange(data, 1, data.length);
                             LOGGER.info(String.format("Received block query with hash %s from %s", Hex.encodeHexString(headerHash, false), packet.getAddress().toString()));
                             byte[] blockMsg = blockchainService.getBlockOnChainByHash(headerHash).toMsg();
-                            NetworkUtils.sendPacket(socketOut, blockMsg, packet.getAddress());
+                            NetworkUtils.sendPacket(socketOut, blockMsg, packet.getAddress(), Config.PORT_NODE_IN);
                             break;
                         }
                     }
@@ -101,7 +101,7 @@ public class NodeImpl implements Node {
     }
 
     private static abstract class ListeningThread extends Thread {
-        private final DatagramSocket socketIn = new DatagramSocket(Config.PORT_IN);
+        private final DatagramSocket socketIn = new DatagramSocket(Config.PORT_NODE_IN);
 
         public ListeningThread() throws SocketException {
             super("NodeListeningThread");
@@ -123,11 +123,11 @@ public class NodeImpl implements Node {
                     packet = new DatagramPacket(data, data.length);
                     // blocking
                     socketIn.receive(packet);
-                    // skips localhost packets
+                    // skips loopback packets
                     InetAddress address = packet.getAddress();
-                    if (address.isAnyLocalAddress() || address.isLoopbackAddress() || NetworkInterface.getByInetAddress(address) != null) {
-                        continue;
-                    }
+//                    if (address.isAnyLocalAddress() || address.isLoopbackAddress() || NetworkInterface.getByInetAddress(address) != null) {
+//                        continue;
+//                    }
                     byte[] finalData = data;
                     DatagramPacket finalPacket = packet;
                     new Thread(() -> digest(finalData, finalPacket)).start();
