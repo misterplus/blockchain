@@ -22,5 +22,5 @@ public interface Miner {
 
     void digestPoolMsgs();
 
-    void init(String[] args);
+    void init();
 }

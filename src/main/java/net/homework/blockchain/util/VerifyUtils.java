@@ -79,7 +79,7 @@ public class VerifyUtils {
         return outputSum;
     }
 
-    public static synchronized boolean verifyTx(Transaction tx, Map<ByteBuffer, WrappedTransaction> txPool, Map<ByteBuffer, Transaction> orphanTxs, DatagramSocket socketOut) {
+    public static synchronized boolean verifyTx(Transaction tx, Map<ByteBuffer, WrappedTransaction> txPool, Map<ByteBuffer, Transaction> orphanTxs, DatagramSocket socketOut, Set<InetAddress> peers) {
         // Check syntactic correctness
         if (tx == null) {
             return false;
@@ -173,7 +173,7 @@ public class VerifyUtils {
         txPool.put(ByteBuffer.wrap(txHash), wrapped);
 
         // Broadcast transaction to our peers
-        //NetworkUtils.broadcast(socketOut, tx.toMsg(), Config.PORT_NODE_IN);
+        NetworkUtils.multicastToPeers(socketOut, tx.toMsg(), peers, Config.PORT_NODE_IN);
 
         // send new tx in pool (txHash/tx) to miners
         NetworkUtils.broadcast(socketOut, wrapped.toMsg(), Config.PORT_MINER_IN);
@@ -184,7 +184,7 @@ public class VerifyUtils {
          */
         for (Transaction orphan : orphanTxs.values()) {
             if (orphan.getInputs().stream().anyMatch(input -> isTxSpentByInput(tx, input))) {
-                verifyTx(orphan, txPool, orphanTxs, socketOut);
+                verifyTx(orphan, txPool, orphanTxs, socketOut, peers);
             }
         }
         return true;
@@ -194,7 +194,7 @@ public class VerifyUtils {
         return Arrays.equals(input.getPreviousTransactionHash(), tx.hashTransaction()) && tx.getOutputs().size() > input.getOutIndex();
     }
 
-    public static synchronized boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, WrappedTransaction> txPool, DatagramSocket socketOut) {
+    public static synchronized boolean verifyBlock(Block block, InetAddress fromPeer, Map<ByteBuffer, Block> orphanBlocks, Map<ByteBuffer, WrappedTransaction> txPool, DatagramSocket socketOut, Set<InetAddress> peers) {
         // Check syntactic correctness
         if (block == null) {
             return false;
@@ -330,13 +330,13 @@ public class VerifyUtils {
                 // Add to chain
                 blockchainService.addBlockToChain(block);
                 // Broadcast block to our peers
-                //NetworkUtils.broadcast(socketOut, block.toMsg(), Config.PORT_NODE_IN);
+                NetworkUtils.multicastToPeers(socketOut, block.toMsg(), peers, Config.PORT_NODE_IN);
 
                 // For each orphan block for which this block is its prev, run all these steps (including this one) recursively on that orphan
                 orphanBlocks.values().forEach(orphanBlock -> {
                     if (Arrays.equals(headerHash, orphanBlock.getHeader().getHashPrevBlock())) {
                         try {
-                            verifyBlock(orphanBlock, InetAddress.getLocalHost(), orphanBlocks, txPool, socketOut);
+                            verifyBlock(orphanBlock, InetAddress.getLocalHost(), orphanBlocks, txPool, socketOut, peers);
                         } catch (UnknownHostException e) {
                             e.printStackTrace();
                         }

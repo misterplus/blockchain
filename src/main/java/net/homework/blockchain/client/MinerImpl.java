@@ -13,10 +13,7 @@ import net.homework.blockchain.util.NetworkUtils;
 import org.apache.commons.codec.binary.Hex;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
+import java.net.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -25,20 +22,27 @@ public class MinerImpl implements Miner {
     private final PriorityQueue<WrappedTransaction> localTxPool = new PriorityQueue<>();
     private final List<WrappedTransaction> revertList = new ArrayList<>();
     private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_MINER_OUT);
-    private final MessageThread msgThread = new MessageThread();
-    private InetAddress node;
-    private byte[] publicKeyHash;
-    private String urlLatestHash;
-    private String urlInitLocalPool;
+    private final InetAddress node;
+    private final MessageThread msgThread;
+    private final byte[] publicKeyHash;
+    private final String urlLatestHash;
+    private final String urlInitLocalPool;
 
 
-    private MinerImpl() throws SocketException {
+    private MinerImpl(String[] args) throws SocketException, UnknownHostException {
+        this.node = InetAddress.getByName(args[0]);
+        this.publicKeyHash = CryptoUtils.getPublicKeyHashFromAddress(args[1]);
+        this.msgThread = new MessageThread(node);
+        this.urlLatestHash = String.format("%s:%d/latestBlockHash", args[0], Config.PORT_HTTP);
+        this.urlInitLocalPool = String.format("%s:%d/txPool", args[0], Config.PORT_HTTP);
     }
 
     @SneakyThrows
     public static void main(String[] args) {
-        MinerImpl miner = new MinerImpl();
-        miner.init(args);
+        LOGGER.info("Starting...");
+        MinerImpl miner = new MinerImpl(args);
+        miner.init();
+        LOGGER.info("Start completed.");
         LOGGER.info("Entering main work loop...");
         while (true) {
             // clear the revert list no matter what
@@ -174,7 +178,7 @@ public class MinerImpl implements Miner {
                 List<byte[]> toRemoveBytes = ByteUtils.fromBytes(msg, new ArrayList<>());
                 if (toRemoveBytes != null) {
                     List<String> toRemoveHex = toRemoveBytes.stream().map(bytes -> Hex.encodeHexString(bytes, false)).collect(Collectors.toList());
-                    LOGGER.debug(String.format("Preparing to remove transactions from local pool:\n%s", toRemoveHex.stream().collect(Collectors.joining("\n"))));
+                    LOGGER.debug(String.format("Preparing to remove transactions from local pool:\n%s", String.join("\n", toRemoveHex)));
                     this.localTxPool.removeIf(wrappedTx -> {
                         String hash = wrappedTx.getTx().hashTransactionHex();
                         boolean test = toRemoveHex.contains(hash);
@@ -188,17 +192,10 @@ public class MinerImpl implements Miner {
         }
     }
 
-    @SneakyThrows
     @Override
-    public void init(String[] args) {
-        LOGGER.info("Starting...");
-        this.urlLatestHash = String.format("%s:%d/latestBlockHash", args[0], Config.PORT_HTTP);
-        this.urlInitLocalPool = String.format("%s:%d/txPool", args[0], Config.PORT_HTTP);
-        this.node = InetAddress.getByName(args[0]);
-        this.publicKeyHash = CryptoUtils.getPublicKeyHashFromAddress(args[1]);
+    public void init() {
         this.initLocalPool();
         this.msgThread.start();
-        LOGGER.info("Start completed.");
     }
 
     private static class MessageThread extends Thread {
@@ -209,9 +206,11 @@ public class MinerImpl implements Miner {
         private final Queue<byte[]> blockMsgs = new LinkedList<>();
         private final DatagramSocket socketIn = new DatagramSocket(Config.PORT_MINER_IN);
         private boolean beaten = false;
+        private final InetAddress node;
 
-        private MessageThread() throws SocketException {
+        private MessageThread(InetAddress node) throws SocketException {
             super("MinerMessageThread");
+            this.node = node;
         }
 
         public boolean isBeaten() {
@@ -231,6 +230,10 @@ public class MinerImpl implements Miner {
                     data = new byte[32768];
                     packet = new DatagramPacket(data, data.length);
                     socketIn.receive(packet);
+                    // only listen for packets from the selected node
+                    if (!packet.getAddress().equals(node)) {
+                        continue;
+                    }
                     boolean isRemove = MsgUtils.isMsgRemove(data);
                     // add to queue
                     if (isRemove) {

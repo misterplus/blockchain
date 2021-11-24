@@ -30,6 +30,7 @@ public class NodeImpl implements Node {
 
     private ListeningThread listeningThread;
     private final DatagramSocket socketOut = new DatagramSocket(Config.PORT_NODE_OUT);
+    private static final Set<InetAddress> PEERS = new HashSet<>();
 
     public NodeImpl() throws SocketException {
     }
@@ -49,7 +50,7 @@ public class NodeImpl implements Node {
                             // Check that size in bytes >= 100
                             if (packet.getLength() >= 100) {
                                 // verify this transaction
-                                accepted = VerifyUtils.verifyTx(tx, TX_POOL, ORPHAN_TXS, socketOut);
+                                accepted = VerifyUtils.verifyTx(tx, TX_POOL, ORPHAN_TXS, socketOut, PEERS);
                             }
                             // send accepted msg back
                             NetworkUtils.sendPacket(socketOut, MsgUtils.toTxMsg(accepted), packet.getAddress(), Config.PORT_USER_IN);
@@ -60,7 +61,7 @@ public class NodeImpl implements Node {
                             Block block = ByteUtils.fromBytes(Arrays.copyOfRange(data, 1, data.length), new Block());
                             String hashString = block == null ? "null" : block.hashHeaderHex();
                             LOGGER.info(String.format("Received block with hash %s from %s", hashString, packet.getAddress().toString()));
-                            boolean accepted = VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL, socketOut);
+                            boolean accepted = VerifyUtils.verifyBlock(block, packet.getAddress(), ORPHAN_BLOCKS, TX_POOL, socketOut, PEERS);
                             NetworkUtils.sendPacket(socketOut, MsgUtils.toBlockMsg(accepted), packet.getAddress(), Config.PORT_MINER_IN);
                             LOGGER.info(String.format("%s block with hash %s from %s", accepted ? "Accepted" : "Rejected", hashString, packet.getAddress().toString()));
                             break;
@@ -70,6 +71,21 @@ public class NodeImpl implements Node {
                             LOGGER.info(String.format("Received block query with hash %s from %s", Hex.encodeHexString(headerHash, false), packet.getAddress().toString()));
                             byte[] blockMsg = blockchainService.getBlockOnChainByHash(headerHash).toMsg();
                             NetworkUtils.sendPacket(socketOut, blockMsg, packet.getAddress(), Config.PORT_NODE_IN);
+                            break;
+                        }
+                        case MsgUtils.PEER: {
+                            LOGGER.info(String.format("Received peer gossip from %s, adding it to peers...", packet.getAddress().toString()));
+                            boolean newPeer = PEERS.add(packet.getAddress());
+                            if (newPeer) {
+                                LOGGER.info(String.format("Replying peer gossip for %s", packet.getAddress().toString()));
+                                NetworkUtils.sendPacket(socketOut, new byte[]{MsgUtils.PEER_ADDED}, packet.getAddress(), Config.PORT_NODE_IN);
+                            } else {
+                                LOGGER.info(String.format("%s is already our peer, continuing...", packet.getAddress().toString()));
+                            }
+                            break;
+                        }
+                        case MsgUtils.PEER_ADDED: {
+                            LOGGER.info(String.format("%s added us as a peer.", packet.getAddress().toString()));
                             break;
                         }
                     }
@@ -94,9 +110,15 @@ public class NodeImpl implements Node {
     }
 
     @Override
+    public void gossipForPeers() {
+        NetworkUtils.broadcast(socketOut, new byte[]{MsgUtils.PEER}, Config.PORT_NODE_IN);
+    }
+
+    @Override
     public void init() {
         LOGGER.info("Starting...");
         this.listenForMsg();
+        this.gossipForPeers();
         LOGGER.info("Start completed.");
     }
 

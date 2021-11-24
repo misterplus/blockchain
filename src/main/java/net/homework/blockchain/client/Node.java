@@ -12,4 +12,6 @@ public interface Node {
     void init();
 
     void gracefulShutdown();
+
+    void gossipForPeers();
 }
