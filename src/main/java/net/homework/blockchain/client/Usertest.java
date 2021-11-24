@@ -22,6 +22,7 @@ import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static net.homework.blockchain.util.ByteUtils.removeLeadingZero;
 
@@ -115,9 +116,9 @@ public class Usertest {
         // 9 - Base58 encoding of 8
         System.out.print("9: ");
         System.out.println(Base58.encode(b8));
-        String result = "{\"OEF31673217A8D528707EC44AE168182A8BE928178C5769EDD8DC427A4274990\": \"0\","+
-"\"7471AC72E90A1CFB208435599A2BCF0E8179F84C86AFCC86EB7992EE1D57711B\": \"0\","+
-"\"720B6FE83D297518368146E6E00ABF74D72F1F79FA723BE57C8635C04038E381\": \"0\","+
+        String result = "{\"OEF31673217A8D528707EC44AE168182A8BE928178C5769EDD8DC427A4274990\": \"0,1\","+
+"\"7471AC72E90A1CFB208435599A2BCF0E8179F84C86AFCC86EB7992EE1D57711B\": \"0,1\","+
+"\"720B6FE83D297518368146E6E00ABF74D72F1F79FA723BE57C8635C04038E381\": \"0,1\","+
 "\"93DC260FABC439E65C29A788CA1C632EA7724BE05937274593E9D5B1B8F13B05\": \"0\","+
 "\"ADA29188EFAE19F58572B22CDE317590453362AOA29E8026CF3DB78D15DE1EA3\":\"0\","+
 "\"F2B2DA9BBFA930AB1F90DBFD2F626249A78744F6B9103B19D08B1635536191B1\": \"0\","+
@@ -125,8 +126,18 @@ public class Usertest {
 "\"15A1A230EE39C6F6FC869709D57FC965EA7407ED1A922CEE762A263FEE7F0BOE\":\"0\","+
 "\"4F99D1FC109C6CE1C2BDB3F42437062977B98EF7BC2E2B67B8B2EEF897FCD494\": \"0\","+
 "\"76C2637618591A729D0E559EADECF8D6656EF6E35BDC7E6FBEA2640BC4705CE8\":\"0\"}";
-        Map<ByteBuffer, List<Integer>> map = new HashMap<>();
+        Map<String, String> map = new HashMap<>();
         map = ByteUtils.fromJson(result,map);
-        System.out.println(map.keySet());
+        //System.out.println(map);
+        Map<ByteBuffer, List<Integer>> map1 = new HashMap<>();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            String mapkey = entry.getKey();
+            ByteBuffer mapKey = ByteBuffer.wrap(mapkey.getBytes(StandardCharsets.UTF_8));
+            String mapvalue = entry.getValue();
+            String[] mapvalueString = mapvalue.split(",");
+            int[] mapvalueint = Arrays.stream(mapvalueString).mapToInt(Integer::parseInt).toArray();
+            List<Integer> mapValue = Arrays.stream(mapvalueint).boxed().collect(Collectors.toList());
+            map1.put(mapKey,mapValue);
+        }
     }
 }

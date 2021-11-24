@@ -31,6 +31,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
 import static net.homework.blockchain.util.NetworkUtils.*;
 import static net.homework.blockchain.Config.*;
 import static net.homework.blockchain.util.ByteUtils.removeLeadingZero;
@@ -140,9 +142,19 @@ public class UserImpl implements User {
     @Override
     public Map<ByteBuffer, List<Integer>> getUTXOs() {
         String result = HttpUtil.get(getUrl());
-        Map<ByteBuffer, List<Integer>> map = new HashMap<>();
+        Map<String, String> map = new HashMap<>();
         map = ByteUtils.fromJson(result,map);
-        return map;
+        Map<ByteBuffer, List<Integer>> byteBufferListMap = new HashMap<>();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            String mapkey = entry.getKey();
+            ByteBuffer mapKey = ByteBuffer.wrap(mapkey.getBytes(StandardCharsets.UTF_8));
+            String mapvalue = entry.getValue();
+            String[] mapvalueString = mapvalue.split(",");
+            int[] mapvalueint = Arrays.stream(mapvalueString).mapToInt(Integer::parseInt).toArray();
+            List<Integer> mapValue = Arrays.stream(mapvalueint).boxed().collect(Collectors.toList());
+            byteBufferListMap.put(mapKey, mapValue);
+        }
+        return byteBufferListMap;
     }
     public String getUrl(){
         return "";
