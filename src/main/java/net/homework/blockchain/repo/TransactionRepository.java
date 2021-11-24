@@ -3,6 +3,7 @@ package net.homework.blockchain.repo;
 import net.homework.blockchain.entity.Transaction;
 import org.springframework.data.repository.CrudRepository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -16,4 +17,7 @@ public interface TransactionRepository extends CrudRepository<Transaction, Integ
 
     // find transactions whose inputs contain scriptPubKey (find txs spent by an address)
     Set<Transaction> findUniqueTransactionsByInputs_ScriptPubKey(byte[] scriptPubKey);
+
+    // find transactions related to scriptPubKey
+    List<Transaction> findUniqueTransactionsByInputs_ScriptPubKeyEqualsOrOutputs_ScriptPubKeyHashEqualsOrderByDummyIdDesc(byte[] scriptPubKey, byte[] scriptPubKeyHash);
 }

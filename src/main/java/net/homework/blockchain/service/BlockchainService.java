@@ -65,7 +65,7 @@ public class BlockchainService {
         Optional<Transaction> optTx = transactionRepository.findTransactionByHashTx(coinbaseTxHash);
         // if coinbase is on chain
         if (optTx.isPresent()) {
-            Optional<Block> optBlock = blockRepository.findBlockByTransactionsContains(optTx.get());
+            Optional<Block> optBlock = blockRepository.findByTransactions_HashTxEquals(optTx.get().hashTransaction());
             if (optBlock.isPresent()) {
                 Block block = optBlock.get();
                 long height = block.getHeight();
@@ -137,14 +137,7 @@ public class BlockchainService {
     }
 
     public List<Transaction> getTransactionsByPublicKey(byte[] publicKey) {
-        Set<Transaction> received = transactionRepository.findUniqueTransactionsByOutputs_ScriptPubKeyHash(CryptoUtils.hashPublicKeyBytes(publicKey));
-        Set<Transaction> spent = transactionRepository.findUniqueTransactionsByInputs_ScriptPubKey(publicKey);
-        List<Transaction> txs = new ArrayList<>();
-        txs.addAll(received);
-        txs.addAll(spent);
-        // sort in reverse tx order
-        txs.sort((o1, o2) -> Long.compare(o2.getDummyId(), o1.getDummyId()));
-        return txs;
+        return transactionRepository.findUniqueTransactionsByInputs_ScriptPubKeyEqualsOrOutputs_ScriptPubKeyHashEqualsOrderByDummyIdDesc(publicKey, CryptoUtils.hashPublicKeyBytes(publicKey));
     }
 
     @SneakyThrows
@@ -189,12 +182,6 @@ public class BlockchainService {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-    }
-
-    @Deprecated
-    public void testMethod() {
-        Transaction tx = getBlockOnChainByHeight(1L).getTransactions().get(0);
-        NodeImpl.TX_POOL.put(ByteBuffer.wrap(tx.hashTransaction()), WrappedTransaction.wrap(tx, 5L));
     }
 
     public long getCurrentBlockHeight() {
