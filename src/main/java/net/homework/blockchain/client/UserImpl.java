@@ -1,9 +1,14 @@
 package net.homework.blockchain.client;
 
+import cn.hutool.http.HttpUtil;
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.fasterxml.jackson.databind.util.JSONPObject;
 import io.leonard.Base58;
 import lombok.SneakyThrows;
 import net.homework.blockchain.entity.Transaction;
+import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
@@ -23,6 +28,7 @@ import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import static net.homework.blockchain.util.NetworkUtils.*;
@@ -94,7 +100,7 @@ public class UserImpl implements User {
                 }
                 input.setPreviousTransactionHash(previousTransactionHash);
                 input.setOutIndex(entry.getValue().get(i));
-                input.setScriptSig(signTransaction(getPreviousTransactionHash(), assemblePrivateKey(removeLeadingZero(praviteKey.toByteArray()))));
+                input.setScriptSig(signTransaction(previousTransactionHash, assemblePrivateKey(removeLeadingZero(praviteKey.toByteArray()))));
                 input.setScriptPubKey(Hex.decodeHex(publicKey));
                 inputs.add(input);
             }
@@ -133,20 +139,12 @@ public class UserImpl implements User {
     }
     @Override
     public Map<ByteBuffer, List<Integer>> getUTXOs() {
-        Map<ByteBuffer, List<Integer>> map = null;
-        List<Integer> outIndex = null;
-        try {
-            outIndex.set(0,0);
-            map.put(ByteBuffer.wrap("OEF31673217A8D528707EC44AE168182A8BE928178C5769EDD8DC427A4274990".getBytes("utf-8")),outIndex);
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
+        String result = HttpUtil.get(getUrl());
+        Map<ByteBuffer, List<Integer>> map = new HashMap<>();
+        map = ByteUtils.fromJson(result,map);
         return map;
     }
-    public byte[] getPreviousTransactionHash(){
-        return null;
-    }
-    public int getOutIndex(){
-        return 0;
+    public String getUrl(){
+        return "";
     }
 }

@@ -1,6 +1,8 @@
 package net.homework.blockchain.client;
 
+import cn.hutool.http.HttpUtil;
 import io.leonard.Base58;
+import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
@@ -12,12 +14,14 @@ import org.bouncycastle.math.ec.ECPoint;
 
 import java.io.*;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
-import java.util.Arrays;
+import java.util.*;
 
 import static net.homework.blockchain.util.ByteUtils.removeLeadingZero;
 
@@ -111,6 +115,18 @@ public class Usertest {
         // 9 - Base58 encoding of 8
         System.out.print("9: ");
         System.out.println(Base58.encode(b8));
-
+        String result = "{\"OEF31673217A8D528707EC44AE168182A8BE928178C5769EDD8DC427A4274990\": \"0\","+
+"\"7471AC72E90A1CFB208435599A2BCF0E8179F84C86AFCC86EB7992EE1D57711B\": \"0\","+
+"\"720B6FE83D297518368146E6E00ABF74D72F1F79FA723BE57C8635C04038E381\": \"0\","+
+"\"93DC260FABC439E65C29A788CA1C632EA7724BE05937274593E9D5B1B8F13B05\": \"0\","+
+"\"ADA29188EFAE19F58572B22CDE317590453362AOA29E8026CF3DB78D15DE1EA3\":\"0\","+
+"\"F2B2DA9BBFA930AB1F90DBFD2F626249A78744F6B9103B19D08B1635536191B1\": \"0\","+
+"\"6FF6B7BEBEF1AE8A95611F069E0A80C5142E1ABC8E63275994324555AF546D00\": \"0\","+
+"\"15A1A230EE39C6F6FC869709D57FC965EA7407ED1A922CEE762A263FEE7F0BOE\":\"0\","+
+"\"4F99D1FC109C6CE1C2BDB3F42437062977B98EF7BC2E2B67B8B2EEF897FCD494\": \"0\","+
+"\"76C2637618591A729D0E559EADECF8D6656EF6E35BDC7E6FBEA2640BC4705CE8\":\"0\"}";
+        Map<ByteBuffer, List<Integer>> map = new HashMap<>();
+        map = ByteUtils.fromJson(result,map);
+        System.out.println(map.keySet());
     }
 }
