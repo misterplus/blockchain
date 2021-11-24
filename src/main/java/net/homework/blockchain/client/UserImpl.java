@@ -1,36 +1,24 @@
 package net.homework.blockchain.client;
 
-import cn.hutool.http.HttpUtil;
-import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONObject;
-import cn.hutool.json.JSONUtil;
-import com.fasterxml.jackson.databind.util.JSONPObject;
+import cn.hutool.http.HttpRequest;
 import io.leonard.Base58;
-import lombok.SneakyThrows;
 import net.homework.blockchain.entity.Transaction;
 import net.homework.blockchain.util.ByteUtils;
-import net.homework.blockchain.util.CryptoUtils;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bouncycastle.jce.ECNamedCurveTable;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jce.spec.ECParameterSpec;
-import org.bouncycastle.math.ec.ECPoint;
 
 import java.io.*;
 import java.math.BigInteger;
 import java.net.*;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static net.homework.blockchain.util.NetworkUtils.*;
@@ -40,39 +28,26 @@ import static net.homework.blockchain.util.CryptoUtils.*;
 
 public class UserImpl implements User {
     @Override
-    public String generatePrivateKey() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, IOException {
+    public void generatePrivateKey() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, IOException {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
-        ECGenParameterSpec curve = new ECGenParameterSpec("secp256k1");
-        kpg.initialize(curve);
-        KeyPair kp = kpg.genKeyPair();
-        ECPrivateKey pri = (ECPrivateKey) kp.getPrivate();
-        // 0 - Private ECDSA Key
-        byte[] b0 = removeLeadingZero(pri.getS().toByteArray());
-        char[] localPriKey = Hex.encodeHex(b0, false);
-        FileWriter fileWriter = new FileWriter("../privateKey.key");
+        kpg.initialize(new ECGenParameterSpec("secp256k1"));
+        ECPrivateKey pri = (ECPrivateKey) kpg.genKeyPair().getPrivate();
+        char[] localPriKey = Hex.encodeHex(removeLeadingZero(pri.getS().toByteArray()), false);
+        FileWriter fileWriter = new FileWriter("./privateKey.key");
         BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
         bufferedWriter.write(String.valueOf(localPriKey));
         bufferedWriter.flush();
         bufferedWriter.close();
         fileWriter.close();
-        return null;
     }
     @Override
     public BigInteger loadPrivateKey() throws IOException, DecoderException {
-        FileReader fileReader = new FileReader("E:/privateKey.key");
-        BufferedReader bufferedReader = new BufferedReader(fileReader);
-        byte[] localKeyByte = Hex.decodeHex(bufferedReader.readLine());
-        BigInteger localKeyBig = new BigInteger(localKeyByte);
-        return localKeyBig;
+        return new BigInteger(Hex.decodeHex(new BufferedReader(new FileReader("./privateKey.key")).readLine()));
     }
     @Override
-    public char[] getPublicKey(BigInteger privateKey) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
-        Security.addProvider(new BouncyCastleProvider());
-        KeyFactory keyFactory = KeyFactory.getInstance("ECDSA","BC");
+    public char[] getPublicKey(BigInteger privateKey) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException, DecoderException, IOException {
         ECParameterSpec eCParameterSpec = ECNamedCurveTable.getParameterSpec("secp256k1");
-        ECPoint Q = eCParameterSpec.getG().multiply(privateKey);
-        org.bouncycastle.jce.spec.ECPublicKeySpec pubSpec = new org.bouncycastle.jce.spec.ECPublicKeySpec(Q, eCParameterSpec);
-        ECPublicKey publicKeyGenerated = (ECPublicKey) keyFactory.generatePublic(pubSpec);
+        ECPublicKey publicKeyGenerated = (ECPublicKey) KeyFactory.getInstance("ECDSA","BC").generatePublic(new org.bouncycastle.jce.spec.ECPublicKeySpec(eCParameterSpec.getG().multiply(loadPrivateKey()), eCParameterSpec));
         byte[] bytes = new byte[65];
         bytes[0] = 4;
         System.arraycopy(removeLeadingZero(publicKeyGenerated.getW().getAffineX().toByteArray()), 0, bytes, 1, 32);
@@ -85,34 +60,39 @@ public class UserImpl implements User {
     }
     @Override
     public Transaction assembleTx(Map<byte[], Long> recipientsWithAmount) throws DecoderException, IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException {
-        BigInteger praviteKey = loadPrivateKey();
-        char[] publicKey = getPublicKey(praviteKey);
+        char[] publicKey = getPublicKey(loadPrivateKey());
         Transaction transaction = new Transaction();
-        List<Transaction.Input> inputs = null;
-        List<Transaction.Output> outputs = null;
-        Map<ByteBuffer,List<Integer>> byteBufferListMap = null;
-        for(Map.Entry<ByteBuffer,List<Integer>> entry:byteBufferListMap.entrySet()){
-            for (int i = 0; i < entry.getValue().size(); i++) {
-                Transaction.Input input = null;
-                entry.getKey().flip();
-                int length = entry.getKey().limit() - entry.getKey().position();
-                byte [] previousTransactionHash = new byte[length];
+        List<Transaction.Input> inputs = new ArrayList<>();
+        List<Transaction.Output> outputs = new ArrayList<>();
+        getUTXOs().forEach((byteBuffer,list) ->{
+            for (int i = 0; i < list.size(); i++) {
+                Transaction.Input input = new Transaction.Input();
+                byteBuffer.flip();
+                byte [] previousTransactionHash = new byte[byteBuffer.limit() - byteBuffer.position()];
                 for (int j=0;j<previousTransactionHash.length;j++){
-                    previousTransactionHash[i]=entry.getKey().get();
+                    previousTransactionHash[i]=byteBuffer.get();
                 }
                 input.setPreviousTransactionHash(previousTransactionHash);
-                input.setOutIndex(entry.getValue().get(i));
-                input.setScriptSig(signTransaction(previousTransactionHash, assemblePrivateKey(removeLeadingZero(praviteKey.toByteArray()))));
-                input.setScriptPubKey(Hex.decodeHex(publicKey));
+                input.setOutIndex(list.get(i));
+                try {
+                    input.setScriptSig(signTransaction(previousTransactionHash, assemblePrivateKey(removeLeadingZero(loadPrivateKey().toByteArray()))));
+                } catch (IOException | DecoderException e) {
+                    e.printStackTrace();
+                }
+                try {
+                    input.setScriptPubKey(Hex.decodeHex(publicKey));
+                } catch (DecoderException e) {
+                    e.printStackTrace();
+                }
                 inputs.add(input);
             }
-        }
-        for(Map.Entry<byte[],Long> entry:recipientsWithAmount.entrySet()){
-            Transaction.Output output = null;
-            output.setValue(entry.getValue());
-            output.setScriptPubKeyHash(entry.getKey());
+        });
+        recipientsWithAmount.forEach((bytes,value)->{
+            Transaction.Output output = new Transaction.Output();
+            output.setValue(value);
+            output.setScriptPubKeyHash(bytes);
             outputs.add(output);
-        }
+        });
         transaction.setInputs(inputs);
         transaction.setOutputs(outputs);
         return transaction;
@@ -121,19 +101,16 @@ public class UserImpl implements User {
     public void broadcastTx(Transaction tx) {
         new Thread(() ->{
             try {
-                DatagramSocket portUserOut =new DatagramSocket(PORT_USER_OUT);
-                byte[] transactionHash = tx.getHashTx();
-                broadcast(portUserOut,transactionHash,PORT_NODE_IN);
+                broadcast(new DatagramSocket(PORT_USER_OUT),tx.getHashTx(),PORT_NODE_IN);
             }catch (IOException e) {
                 e.printStackTrace();
             }
         }).start();
         new Thread(() ->{
             try {
-                DatagramSocket portUserIn =new DatagramSocket(PORT_USER_IN);
                 byte[] receive = new byte[1024];
                 DatagramPacket packet = new DatagramPacket(receive,receive.length);
-                portUserIn.receive(packet);
+                new DatagramSocket(PORT_USER_IN).receive(packet);
             }catch (IOException e) {
                 e.printStackTrace();
             }
@@ -141,22 +118,25 @@ public class UserImpl implements User {
     }
     @Override
     public Map<ByteBuffer, List<Integer>> getUTXOs() {
-        String result = HttpUtil.get(getUrl());
-        Map<String, String> map = new HashMap<>();
-        map = ByteUtils.fromJson(result,map);
+        String result = HttpRequest.get("localhost:"+gethost()+"/wallet/utxo")
+                .form("publicKey",getKey())
+                .execute().body();
+        Map<String, String> map = ByteUtils.fromJson(result,new HashMap<>());
         Map<ByteBuffer, List<Integer>> byteBufferListMap = new HashMap<>();
-        for (Map.Entry<String, String> entry : map.entrySet()) {
-            String mapkey = entry.getKey();
-            ByteBuffer mapKey = ByteBuffer.wrap(mapkey.getBytes(StandardCharsets.UTF_8));
-            String mapvalue = entry.getValue();
-            String[] mapvalueString = mapvalue.split(",");
-            int[] mapvalueint = Arrays.stream(mapvalueString).mapToInt(Integer::parseInt).toArray();
-            List<Integer> mapValue = Arrays.stream(mapvalueint).boxed().collect(Collectors.toList());
-            byteBufferListMap.put(mapKey, mapValue);
-        }
+        assert map != null;
+        map.forEach((key, list) -> {
+            try {
+                byteBufferListMap.put(ByteBuffer.wrap(Hex.decodeHex(key)),Arrays.stream(list.split(",")).map(Integer::parseInt).collect(Collectors.toList()));
+            }catch (DecoderException e){
+                e.printStackTrace();
+            }
+        });
         return byteBufferListMap;
     }
-    public String getUrl(){
+    public String gethost(){
+        return "";
+    }
+    public String getKey(){
         return "";
     }
 }

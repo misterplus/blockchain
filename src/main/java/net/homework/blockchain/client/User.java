@@ -14,11 +14,11 @@ import java.util.List;
 import java.util.Map;
 
 public interface User {
-    String generatePrivateKey() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, IOException;
+    void generatePrivateKey() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, IOException;
 
     BigInteger loadPrivateKey() throws IOException, DecoderException;
 
-    char[] getPublicKey(BigInteger privateKey) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException;
+    char[] getPublicKey(BigInteger privateKey) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException, DecoderException, IOException;
 
     String getAddress(char[] publicKey) throws DecoderException;
 
@@ -35,5 +35,5 @@ public interface User {
      *
      * @return transactionHash, outIndex
      */
-    Map<ByteBuffer, List<Integer>> getUTXOs();
+    Map<ByteBuffer, List<Integer>> getUTXOs() throws DecoderException;
 }
