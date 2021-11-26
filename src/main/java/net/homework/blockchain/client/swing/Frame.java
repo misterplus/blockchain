@@ -1,20 +1,13 @@
-package net.homework.blockchain.client;
+package net.homework.blockchain.client.swing;
 
 import lombok.SneakyThrows;
-import org.apache.commons.codec.binary.Hex;
+import net.homework.blockchain.client.UserImpl;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.security.KeyPairGenerator;
-import java.security.interfaces.ECPrivateKey;
-import java.security.spec.ECGenParameterSpec;
-
-import static net.homework.blockchain.util.ByteUtils.removeLeadingZero;
 
 public class Frame extends JFrame {
     public Frame()
@@ -32,13 +25,12 @@ public class Frame extends JFrame {
             genPriKey.addActionListener(new ActionListener() {
                 @SneakyThrows
                 public void actionPerformed(ActionEvent e) {
-                    userImpl.generatePrivateKey();
+                    userImpl.savePrivateKey(userImpl.generatePrivateKey());
                 }
             });
             mainPanel.add(genPriKey);
 
         }
-        //处理按钮单击事件的匿名内部类
         public static void main(String[] args) {
             Frame frame=new Frame();
             frame.setVisible(true);

@@ -2,6 +2,7 @@ package net.homework.blockchain.util;
 
 import io.leonard.Base58;
 import lombok.SneakyThrows;
+import org.apache.commons.codec.binary.Hex;
 import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.interfaces.ECPrivateKey;
 import org.bouncycastle.jce.interfaces.ECPublicKey;
@@ -94,5 +95,14 @@ public class CryptoUtils {
 
     public static byte[] hashPublicKeyBytes(byte[] publicKeyBytes) {
         return ripmd160(sha256(publicKeyBytes));
+    }
+    public static String getAddressFromPublicKey(ECPublicKey publicKey){
+        byte[] b4 = new byte[21];
+        System.arraycopy(CryptoUtils.ripmd160(CryptoUtils.sha256(publicKey.getQ().getEncoded())), 0, b4, 1, 20);
+        byte[] b7 = Arrays.copyOf(CryptoUtils.sha256Twice(b4), 4);
+        byte[] b8 = new byte[25];
+        System.arraycopy(b4, 0, b8, 0, 21);
+        System.arraycopy(b7, 0, b8, 21, 4);
+        return Base58.encode(b8);
     }
 }

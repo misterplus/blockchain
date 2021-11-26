@@ -1,32 +1,26 @@
 package net.homework.blockchain.client;
 
 import net.homework.blockchain.entity.Transaction;
-import org.apache.commons.codec.DecoderException;
+import org.bouncycastle.jce.interfaces.ECPrivateKey;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
-import java.security.spec.InvalidKeySpecException;
 import java.util.List;
 import java.util.Map;
 
 public interface User {
-    void generatePrivateKey() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, IOException;
+    ECPrivateKey generatePrivateKey() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, NoSuchProviderException;
 
-    BigInteger loadPrivateKey() throws IOException, DecoderException;
-
-    char[] getPublicKey(BigInteger privateKey) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException, DecoderException, IOException;
-
-    String getAddress(char[] publicKey) throws DecoderException;
+    ECPrivateKey loadPrivateKey() throws IOException;
 
     /**
      * @param recipientsWithAmount publicKeyHash, value
      * @return the assembled transaction
      */
-    Transaction assembleTx(Map<byte[], Long> recipientsWithAmount) throws DecoderException, IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException;
+    Transaction assembleTx(Map<byte[], Long> recipientsWithAmount);
 
     void broadcastTx(Transaction tx);
 
@@ -35,5 +29,5 @@ public interface User {
      *
      * @return transactionHash, outIndex
      */
-    Map<ByteBuffer, List<Integer>> getUTXOs() throws DecoderException;
+    Map<ByteBuffer, List<Integer>> getUTXOs();
 }
