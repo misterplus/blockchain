@@ -168,10 +168,10 @@ public class MinerImpl implements Miner {
             // add or remove shit
             byte[] msg = Arrays.copyOfRange(multiPart, 1, multiPart.length);
             if (MsgUtils.isMsgAdd(multiPart)) {
-                List<WrappedTransaction> toAdd = ByteUtils.fromBytes(msg, new ArrayList<>());
-                this.localTxPool.addAll(toAdd);
-                if (toAdd != null && !toAdd.isEmpty()) {
-                    LOGGER.debug(String.format("Added transactions to local pool:\n%s", toAdd.stream().map((wrapped) -> wrapped.getTx().hashTransactionHex()).collect(Collectors.joining("\n"))));
+                WrappedTransaction toAdd = ByteUtils.fromBytes(msg, new WrappedTransaction());
+                this.localTxPool.add(toAdd);
+                if (toAdd != null) {
+                    LOGGER.debug(String.format("Added transaction with hash %s to local pool.", toAdd.getTx().hashTransactionHex()));
                 }
             } else if (MsgUtils.isMsgRemove(multiPart)) {
                 // better implementation possibly?
@@ -231,9 +231,9 @@ public class MinerImpl implements Miner {
                     packet = new DatagramPacket(data, data.length);
                     socketIn.receive(packet);
                     // only listen for packets from the selected node
-                    if (!packet.getAddress().equals(node)) {
-                        continue;
-                    }
+//                    if (!packet.getAddress().equals(node)) {
+//                        continue;
+//                    }
                     boolean isRemove = MsgUtils.isMsgRemove(data);
                     // add to queue
                     if (isRemove) {

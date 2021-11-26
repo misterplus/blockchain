@@ -1,113 +1,162 @@
 package net.homework.blockchain.client;
 
-import io.leonard.Base58;
+import cn.hutool.http.HttpRequest;
 import lombok.SneakyThrows;
 import net.homework.blockchain.entity.Transaction;
+import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
+import net.homework.blockchain.util.MsgUtils;
+import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.interfaces.ECPrivateKey;
 import org.bouncycastle.jce.interfaces.ECPublicKey;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.jce.spec.ECParameterSpec;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.nio.ByteBuffer;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.Security;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.security.*;
 
-import static net.homework.blockchain.util.ByteUtils.removeLeadingZero;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static net.homework.blockchain.Config.*;
+import static net.homework.blockchain.util.CryptoUtils.generatePublicKey;
+import static net.homework.blockchain.util.CryptoUtils.signTransaction;
+import static net.homework.blockchain.util.NetworkUtils.broadcast;
 
 public class UserImpl implements User {
+
+    private ECPrivateKey privateKey;
+    private ECPublicKey publicKey;
+    private String node;
+
     @SneakyThrows
+    public static void main(String[] args){
+        UserImpl userImpl = new UserImpl();
+//        if (args[0].equals("1")) {
+//            userImpl.privateKey = userImpl.generatePrivateKey();
+//            userImpl.savePrivateKey(userImpl.privateKey);
+//        }
+        userImpl.privateKey = CryptoUtils.assemblePrivateKey(Hex.decodeHex(args[0]));
+        userImpl.publicKey = generatePublicKey(userImpl.privateKey);
+        userImpl.node = args[1];
+        Map<byte[], Long> recipientsWithAmount = new HashMap<>();
+        recipientsWithAmount.put(CryptoUtils.getPublicKeyHashFromAddress(args[3]), Long.parseLong(args[2]));
+        Transaction transaction = userImpl.assembleTx(recipientsWithAmount);
+        userImpl.broadcastTx(transaction);
+    }
+
     @Override
-    public String generatePrivateKey() {
+    public ECPrivateKey generatePrivateKey(){
         Security.addProvider(new BouncyCastleProvider());
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("ECDSA", "BC");
-        ECParameterSpec curve = ECNamedCurveTable.getParameterSpec("secp256k1");
-        kpg.initialize(curve);
-        KeyPair kp = kpg.genKeyPair();
-        ECPrivateKey pri = (ECPrivateKey) kp.getPrivate();
-        ECPublicKey pub = (ECPublicKey) kp.getPublic();
-        // 0 - Private ECDSA Key
-        byte[] b0 = removeLeadingZero(pri.getD().toByteArray());
-        System.out.println("0: ");
-        System.out.println(Hex.encodeHex(b0, false));
-
-        // 1 - Public ECDSA Key
-        byte[] b1 = pub.getQ().getEncoded();
-        System.out.println("1: ");
-        System.out.println(Hex.encodeHex(b1, false));
-
-        // 2 - SHA-256 hash of 1
-        byte[] b2 = CryptoUtils.sha256(b1);
-        System.out.print("2: ");
-        System.out.println(Hex.encodeHex(b2, false));
-
-        // 3 - RIPEMD-160 Hash of 2
-        byte[] b3 = CryptoUtils.ripmd160(b2);
-        System.out.print("3: ");
-        System.out.println(Hex.encodeHex(b3, false));
-
-        // 4 - Adding network bytes to 3
-        byte[] b4 = new byte[21];
-        System.arraycopy(b3, 0, b4, 1, 20);
-        System.out.print("4: ");
-        System.out.println(Hex.encodeHex(b4, false));
-
-        // 6 - double SHA-256 hash of 4
-        byte[] b6 = CryptoUtils.sha256Twice(b4);
-        System.out.print("6: ");
-        System.out.println(Hex.encodeHex(b6, false));
-
-        // 7 - First four bytes of 6
-        byte[] b7 = Arrays.copyOf(b6, 4);
-        System.out.print("7: ");
-        System.out.println(Hex.encodeHex(b7, false));
-
-        // 8 - Adding 7 at the end of 4
-        byte[] b8 = new byte[25];
-        System.arraycopy(b4, 0, b8, 0, 21);
-        System.arraycopy(b7, 0, b8, 21, 4);
-        System.out.print("8: ");
-        System.out.println(Hex.encodeHex(b8, false));
-
-        // 9 - Base58 encoding of 8
-        System.out.print("9: ");
-        System.out.println(Base58.encode(b8));
+        KeyPairGenerator kpg = null;
+        try {
+            kpg = KeyPairGenerator.getInstance("ECDSA", "BC");
+            kpg.initialize(ECNamedCurveTable.getParameterSpec("secp256k1"));
+        } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidAlgorithmParameterException e) {
+            e.printStackTrace();
+        }
+        if (kpg != null) {
+            return (ECPrivateKey) kpg.genKeyPair().getPrivate();
+        }
         return null;
     }
 
-    @Override
-    public String loadPrivateKey() {
-        return null;
+    public void savePrivateKey(ECPrivateKey privateKey){
+        byte[] privateKeyBytes = privateKey.getD().toByteArray();
+        try {
+            FileOutputStream out = new FileOutputStream("./privateKey.key");
+            out.write(privateKeyBytes);
+            out.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     @Override
-    public String getPublicKey(String privateKey) {
-        return null;
+    public ECPrivateKey loadPrivateKey() throws IOException {
+        FileInputStream input = new FileInputStream("./privateKey.key");
+        byte[] bytes = new byte[32];
+        input.read(bytes);
+        ECPrivateKey privateKey = CryptoUtils.assemblePrivateKey(bytes);
+        input.close();
+        return privateKey;
     }
 
-    @Override
-    public String getAddress(String publicKey) {
-        return null;
-    }
 
     @Override
-    public Transaction assembleTx(Map<ByteBuffer, byte[]> recipientsWithAmount) {
-        return null;
+    public Transaction assembleTx(Map<byte[], Long> recipientsWithAmount) {
+        Transaction transaction = new Transaction();
+        List<Transaction.Input> inputs = new ArrayList<>();
+        List<Transaction.Output> outputs = new ArrayList<>();
+        getUTXOs().forEach((byteBuffer, list) -> {
+            for (Integer integer : list) {
+                Transaction.Input input = new Transaction.Input();
+                byte[] previousTransactionHash = byteBuffer.array();
+                input.setPreviousTransactionHash(previousTransactionHash);
+                input.setOutIndex(integer);
+                input.setScriptSig(signTransaction(previousTransactionHash, privateKey));
+                input.setScriptPubKey(publicKey.getQ().getEncoded());
+                inputs.add(input);
+            }
+        });
+        recipientsWithAmount.forEach((bytes, value) -> {
+            Transaction.Output output = new Transaction.Output();
+            output.setValue(value);
+            output.setScriptPubKeyHash(bytes);
+            outputs.add(output);
+        });
+        transaction.setInputs(inputs);
+        transaction.setOutputs(outputs);
+        return transaction;
     }
 
     @Override
     public void broadcastTx(Transaction tx) {
-
+        new Thread(() -> {
+            try {
+                broadcast(new DatagramSocket(PORT_USER_OUT), tx.toMsg(), PORT_NODE_IN);
+                byte[] receive = new byte[1];
+                DatagramPacket packet = new DatagramPacket(receive, receive.length);
+                new DatagramSocket(PORT_USER_IN).receive(packet);
+                switch (receive[0]) {
+                    case MsgUtils.TX_ACCEPTED: {
+                        System.out.println("Tx accpeted");
+                        break;
+                    }
+                    case MsgUtils.TX_REJECTED: {
+                        System.out.println("Tx rejected");
+                        break;
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 
     @Override
     public Map<ByteBuffer, List<Integer>> getUTXOs() {
-        return null;
+        String result = HttpRequest.get(node + ":8080/wallet/utxo")
+                .form("publicKey", Hex.encodeHexString(publicKey.getQ().getEncoded()))
+                .execute().body();
+        Map<String, String> map = ByteUtils.fromJson(result, new HashMap<>());
+        Map<ByteBuffer, List<Integer>> byteBufferListMap = new HashMap<>();
+        if (map != null) {
+            map.forEach((key, list) -> {
+                try {
+                    byteBufferListMap.put(ByteBuffer.wrap(Hex.decodeHex(key)), Arrays.stream(list.split(",")).map(Integer::parseInt).collect(Collectors.toList()));
+                } catch (DecoderException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+        return byteBufferListMap;
     }
 }

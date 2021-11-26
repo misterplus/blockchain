@@ -4,7 +4,7 @@ public interface Config {
 
     // chain constants
     int DIFFICULTY = 3; // difficulty in BYTES (8 * DIFFICULTY bits)
-    int COINBASE_MATURITY = 10;
+    int COINBASE_MATURITY = 0;
     int MAX_BLOCK_SIZE = 32768;
     long BLOCK_FEE = 500000000L; // 5 coins
 

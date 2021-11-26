@@ -112,7 +112,7 @@ public class NodeImpl implements Node {
 
     @Override
     public void gossipForPeers() {
-        NetworkUtils.broadcast(socketOut, new byte[]{MsgUtils.PEER}, Config.PORT_NODE_IN);
+        //NetworkUtils.broadcast(socketOut, new byte[]{MsgUtils.PEER}, Config.PORT_NODE_IN);
     }
 
     @Override
