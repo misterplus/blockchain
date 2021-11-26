@@ -112,6 +112,7 @@ public class MinerImpl implements Miner {
     public void updateReward(Block block, long extraFee) {
         long feePrev = block.getTransactions().get(0).getOutputs().get(0).getValue();
         block.getTransactions().get(0).getOutputs().get(0).setValue(feePrev + extraFee);
+        block.updateCoinbase();
         LOGGER.debug(String.format("Updated miner fee from %d to %d for block with hash %s", feePrev, feePrev + extraFee, block.hashHeaderHex()));
     }
 
@@ -131,7 +132,6 @@ public class MinerImpl implements Miner {
         boolean blockFull = false;
         long extraFee = 0L;
         digestPoolMsgs();
-        LOGGER.debug(String.format("Filling block with hash %s...", block.hashHeaderHex()));
         // keep adding txs until block is full or local pool is empty
         while (block.toBytes().length <= Config.MAX_BLOCK_SIZE && !localTxPool.isEmpty()) {
             // get the most valuable one, but don't remove it from the queue
@@ -177,6 +177,7 @@ public class MinerImpl implements Miner {
                 // better implementation possibly?
                 List<byte[]> toRemoveBytes = ByteUtils.fromBytes(msg, new ArrayList<>());
                 if (toRemoveBytes != null) {
+                    // TODO: parsing bug
                     List<String> toRemoveHex = toRemoveBytes.stream().map(bytes -> Hex.encodeHexString(bytes, false)).collect(Collectors.toList());
                     LOGGER.debug(String.format("Preparing to remove transactions from local pool:\n%s", String.join("\n", toRemoveHex)));
                     this.localTxPool.removeIf(wrappedTx -> {

@@ -306,7 +306,7 @@ public class VerifyUtils {
                         return false;
                     }
                     // Reject if the sum of input values <= sum of output values (must pay transaction fee)
-                    minerFee = outSumIter.next() - inputSum;
+                    minerFee = inputSum - outSumIter.next();
                     if (minerFee <= 0L) {
                         return false;
                     }
