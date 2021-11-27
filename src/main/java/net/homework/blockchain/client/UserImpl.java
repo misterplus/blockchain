@@ -1,9 +1,11 @@
 package net.homework.blockchain.client;
 
 import cn.hutool.http.HttpRequest;
+import lombok.SneakyThrows;
 import net.homework.blockchain.entity.Transaction;
 import net.homework.blockchain.util.ByteUtils;
 import net.homework.blockchain.util.CryptoUtils;
+import net.homework.blockchain.util.MsgUtils;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bouncycastle.jce.ECNamedCurveTable;
@@ -11,6 +13,7 @@ import org.bouncycastle.jce.interfaces.ECPrivateKey;
 import org.bouncycastle.jce.interfaces.ECPublicKey;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
+import javax.swing.*;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -33,16 +36,18 @@ public class UserImpl implements User {
     private ECPublicKey publicKey;
     private String node;
 
+    @SneakyThrows
     public static void main(String[] args){
         UserImpl userImpl = new UserImpl();
-        if (args[0].equals("1")) {
-            userImpl.privateKey = userImpl.generatePrivateKey();
-            userImpl.savePrivateKey(userImpl.privateKey);
-        }
-        userImpl.publicKey=generatePublicKey(userImpl.privateKey);
+//        if (args[0].equals("1")) {
+//            userImpl.privateKey = userImpl.generatePrivateKey();
+//            userImpl.savePrivateKey(userImpl.privateKey);
+//        }
+        userImpl.privateKey = CryptoUtils.assemblePrivateKey(Hex.decodeHex(args[0]));
+        userImpl.publicKey = generatePublicKey(userImpl.privateKey);
         userImpl.node = args[1];
         Map<byte[], Long> recipientsWithAmount = new HashMap<>();
-        recipientsWithAmount.put(CryptoUtils.getPublicKeyHashFromAddress(args[3]),Long.parseLong(args[2]));
+        recipientsWithAmount.put(CryptoUtils.getPublicKeyHashFromAddress(args[3]), Long.parseLong(args[2]));
         Transaction transaction = userImpl.assembleTx(recipientsWithAmount);
         userImpl.broadcastTx(transaction);
     }
@@ -92,15 +97,11 @@ public class UserImpl implements User {
         List<Transaction.Input> inputs = new ArrayList<>();
         List<Transaction.Output> outputs = new ArrayList<>();
         getUTXOs().forEach((byteBuffer, list) -> {
-            for (int i = 0; i < list.size(); i++) {
+            for (Integer integer : list) {
                 Transaction.Input input = new Transaction.Input();
-                byteBuffer.flip();
-                byte[] previousTransactionHash = new byte[byteBuffer.limit() - byteBuffer.position()];
-                for (int j = 0; j < previousTransactionHash.length; j++) {
-                    previousTransactionHash[i] = byteBuffer.get();
-                }
+                byte[] previousTransactionHash = byteBuffer.array();
                 input.setPreviousTransactionHash(previousTransactionHash);
-                input.setOutIndex(list.get(i));
+                input.setOutIndex(integer);
                 input.setScriptSig(signTransaction(previousTransactionHash, privateKey));
                 input.setScriptPubKey(publicKey.getQ().getEncoded());
                 inputs.add(input);
@@ -121,22 +122,19 @@ public class UserImpl implements User {
     public void broadcastTx(Transaction tx) {
         new Thread(() -> {
             try {
-                broadcast(new DatagramSocket(PORT_USER_OUT), tx.hashTransaction(), PORT_NODE_IN);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
-        new Thread(() -> {
-            try {
-                byte[] receive = new byte[1024];
+                broadcast(new DatagramSocket(PORT_USER_OUT), tx.toMsg(), PORT_NODE_IN);
+                byte[] receive = new byte[1];
                 DatagramPacket packet = new DatagramPacket(receive, receive.length);
                 new DatagramSocket(PORT_USER_IN).receive(packet);
-                if(new String(receive).charAt(0)=='A'){
-                    System.out.println("Accepted");
-                    //TODO showMessageDialog Accepted
-                }else{
-                    System.out.println("Rejected");
-                    //TODO showMessageDialog Rejected
+                switch (receive[0]) {
+                    case MsgUtils.TX_ACCEPTED: {
+                        JOptionPane.showMessageDialog(new JPanel(),"生成成功！","提示",JOptionPane.PLAIN_MESSAGE);
+                        break;
+                    }
+                    case MsgUtils.TX_REJECTED: {
+                        JOptionPane.showMessageDialog(new JPanel(),"用户名或密码错误！","错误 ",0);
+                        break;
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
