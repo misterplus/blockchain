@@ -317,11 +317,11 @@ public class VerifyUtils {
                     return false;
                 }
                 // For each transaction in the block, delete any matching transaction from the transaction pool
-                List<byte[]> removedTxHashes = new ArrayList<>();
+                List<String> removedTxHashes = new ArrayList<>();
                 txs.forEach(tx -> {
                     WrappedTransaction removed = txPool.remove(ByteBuffer.wrap(tx.hashTransaction()));
                     if (removed != null) {
-                        removedTxHashes.add(removed.getTx().hashTransaction());
+                        removedTxHashes.add(removed.getTx().hashTransactionHex());
                     }
                 });
                 // send updated tx pool to miners (which txs are no longer in pool)

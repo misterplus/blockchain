@@ -105,21 +105,21 @@ public class BlockchainService {
         Map<ByteBuffer, List<Integer>> utxos = new HashMap<>();
         // 0: find all txs containing outputs that this address has ever received
         Set<Transaction> txs = transactionRepository.findUniqueTransactionsByOutputs_ScriptPubKeyHash(publicKeyHash);
-        // 1: create a list for each of these txs
-        txs.forEach(tx -> utxos.put(ByteBuffer.wrap(tx.hashTransaction()), new ArrayList<>()));
-        // 2: index all outputs, getting a map for all received outputs
         txs.forEach(tx -> {
             ByteBuffer key = ByteBuffer.wrap(tx.hashTransaction());
-            // for each output in each tx
+            // 1: for each output in each tx
             for (int i = 0; i < tx.getOutputs().size(); i++) {
-                // if this output belongs to this address, map it
+                // 2: if this output belongs to this address, and it's not spent, map it
                 if (Arrays.equals(tx.getOutputs().get(i).getScriptPubKeyHash(), publicKeyHash)) {
-                    utxos.get(key).add(i);
+                    if (!isOutputSpentOnChain(key.array(), i)) {
+                        if (!utxos.containsKey(key)) {
+                            utxos.put(key, new ArrayList<>());
+                        }
+                        utxos.get(key).add(i);
+                    }
                 }
             }
         });
-        // 3: filter out spent txs
-        utxos.forEach((txHash, outIndexes) -> outIndexes.removeIf(index -> isOutputSpentOnChain(txHash.array(), index)));
         return utxos;
     }
 

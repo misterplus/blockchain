@@ -32,6 +32,11 @@ public class MerkleTree {
         }
     }
 
+    public void updateCoinbaseHash(byte[] coinbaseTxHash) {
+        this.tree.set(0, coinbaseTxHash);
+        rehash();
+    }
+
     public void revert() {
         this.tree.remove(this.tree.size() - 1);
         rehash();

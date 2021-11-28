@@ -113,7 +113,7 @@ public class MinerImpl implements Miner {
         long feePrev = block.getTransactions().get(0).getOutputs().get(0).getValue();
         block.getTransactions().get(0).getOutputs().get(0).setValue(feePrev + extraFee);
         block.updateCoinbase();
-        LOGGER.debug(String.format("Updated miner fee from %d to %d for block with hash %s", feePrev, feePrev + extraFee, block.hashHeaderHex()));
+        LOGGER.debug(String.format("Updated miner fee from %d to %d", feePrev, feePrev + extraFee));
     }
 
     @Override
@@ -175,14 +175,12 @@ public class MinerImpl implements Miner {
                 }
             } else if (MsgUtils.isMsgRemove(multiPart)) {
                 // better implementation possibly?
-                List<byte[]> toRemoveBytes = ByteUtils.fromBytes(msg, new ArrayList<>());
-                if (toRemoveBytes != null) {
-                    // TODO: parsing bug
-                    List<String> toRemoveHex = toRemoveBytes.stream().map(bytes -> Hex.encodeHexString(bytes, false)).collect(Collectors.toList());
-                    LOGGER.debug(String.format("Preparing to remove transactions from local pool:\n%s", String.join("\n", toRemoveHex)));
+                List<String> toRemoveHashes = ByteUtils.fromBytes(msg, new ArrayList<>());
+                if (toRemoveHashes != null) {
+                    LOGGER.debug(String.format("Preparing to remove transactions from local pool:\n%s", String.join("\n", toRemoveHashes)));
                     this.localTxPool.removeIf(wrappedTx -> {
                         String hash = wrappedTx.getTx().hashTransactionHex();
-                        boolean test = toRemoveHex.contains(hash);
+                        boolean test = toRemoveHashes.contains(hash);
                         if (test) {
                             LOGGER.debug(String.format("Transaction with hash %s is removed from local pool.", hash));
                         }

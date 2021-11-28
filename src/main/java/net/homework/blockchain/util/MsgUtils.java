@@ -51,7 +51,7 @@ public class MsgUtils {
         return msg;
     }
 
-    public static byte[] toRemoveMsg(List<byte[]> removedTxHashes) {
+    public static byte[] toRemoveMsg(List<String> removedTxHashes) {
         byte[] part = ByteUtils.toBytes(removedTxHashes);
         if (part == null) {
             return null;
