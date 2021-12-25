@@ -3,6 +3,7 @@ package net.homework.blockchain.controller;
 import net.homework.blockchain.client.NodeImpl;
 import net.homework.blockchain.entity.Block;
 import net.homework.blockchain.entity.Transaction;
+import net.homework.blockchain.entity.WrappedBlock;
 import net.homework.blockchain.service.BlockchainService;
 import net.homework.blockchain.util.ByteUtils;
 import org.apache.commons.codec.DecoderException;
@@ -27,15 +28,15 @@ public class BlockchainController {
     private BlockchainService blockchainService;
 
     @RequestMapping("block/{height}")
-    public Block getBlockByHeight(@PathVariable long height) {
-        return height < 1L ? null : blockchainService.getBlockOnChainByHeight(height);
+    public WrappedBlock getBlockByHeight(@PathVariable long height) {
+        return height < 1L ? null : WrappedBlock.wrap(blockchainService.getBlockOnChainByHeight(height));
     }
 
     @RequestMapping("block")
-    public Block getBlockByHash(@RequestParam String headerHash) {
+    public WrappedBlock getBlockByHash(@RequestParam String headerHash) {
         try {
             byte[] headerBytes = Hex.decodeHex(headerHash);
-            return blockchainService.getBlockOnChainByHash(headerBytes);
+            return WrappedBlock.wrap(blockchainService.getBlockOnChainByHash(headerBytes));
         } catch (DecoderException e) {
             return null;
         }
