@@ -101,7 +101,7 @@ public class UserImpl implements User {
                 byte[] previousTransactionHash = byteBuffer.array();
                 input.setPreviousTransactionHash(previousTransactionHash);
                 input.setOutIndex(integer);
-                input.setScriptSig(signTransaction(previousTransactionHash, privateKey));
+                input.setScriptSig(signTransaction(previousTransactionHash, integer, privateKey));
                 input.setScriptPubKey(publicKey.getQ().getEncoded());
                 inputs.add(input);
             }

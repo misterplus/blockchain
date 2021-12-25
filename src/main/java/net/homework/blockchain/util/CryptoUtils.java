@@ -74,16 +74,31 @@ public class CryptoUtils {
     }
 
     @SneakyThrows
-    public static byte[] signTransaction(byte[] transactionHash, ECPrivateKey privateKey) {
+    public static byte[] signTransaction(byte[] transactionHash, int outIndex, ECPrivateKey privateKey) {
         signer.initSign(privateKey);
-        signer.update(transactionHash);
+        byte[] txHashWithOutIndex = new byte[transactionHash.length + 4];
+        System.arraycopy(transactionHash, 0, txHashWithOutIndex, 0, transactionHash.length);
+        System.arraycopy(intToBytes(outIndex), 0, txHashWithOutIndex, transactionHash.length, 4);
+        signer.update(txHashWithOutIndex);
         return signer.sign();
     }
 
+    public static byte[] intToBytes(int i) {
+        byte[] bytes = new byte[4];
+        bytes[0] = (byte) (i & 0xff);
+        bytes[1] = (byte) ((i >> 8) & 0xff);
+        bytes[2] = (byte) ((i >> 16) & 0xff);
+        bytes[3] = (byte) ((i >> 24) & 0xff);
+        return bytes;
+    }
+
     @SneakyThrows
-    public static boolean verifyTransaction(byte[] transactionHash, byte[] signedTransactionHash, ECPublicKey publicKey) {
+    public static boolean verifyTransaction(byte[] transactionHash, byte[] signedTransactionHash, ECPublicKey publicKey, int outIndex) {
         signer.initVerify(publicKey);
-        signer.update(transactionHash);
+        byte[] txHashWithOutIndex = new byte[transactionHash.length + 4];
+        System.arraycopy(transactionHash, 0, txHashWithOutIndex, 0, transactionHash.length);
+        System.arraycopy(intToBytes(outIndex), 0, txHashWithOutIndex, transactionHash.length, 4);
+        signer.update(txHashWithOutIndex);
         return signer.verify(signedTransactionHash);
     }
 

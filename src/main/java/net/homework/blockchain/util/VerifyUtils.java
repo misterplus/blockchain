@@ -43,7 +43,7 @@ public class VerifyUtils {
     }
 
     public static boolean verifyInput(Transaction.Input input) {
-        return CryptoUtils.verifyTransaction(input.getPreviousTransactionHash(), input.getScriptSig(), CryptoUtils.assemblePublicKey(input.getScriptPubKey()));
+        return CryptoUtils.verifyTransaction(input.getPreviousTransactionHash(), input.getScriptSig(), CryptoUtils.assemblePublicKey(input.getScriptPubKey()), input.getOutIndex());
     }
 
     public static boolean isMoneyValueIllegal(long value) {
