@@ -95,4 +95,9 @@ public class BlockchainController {
     public String getTransactionPool() {
         return ByteUtils.toJson(NodeImpl.TX_POOL.values());
     }
+
+    @RequestMapping("currentHeight")
+    public long getCurrentHeight() {
+        return blockchainService.getCurrentBlockHeight();
+    }
 }
